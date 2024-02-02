@@ -58,8 +58,8 @@
 
 % Reference control
 %\RequirePackage[numbers,sort&compress,square,comma]{natbib}
-\RequirePackage[sort&compress,comma]{natbib}
-\bibliographystyle{agsm}
+\usepackage[square,sort,comma,numbers]{natbib}
+\bibliographystyle{abbrv}
 
 \typearea[current]{calc} % force page layout recalculation after
                          % changing all the fonts
@@ -239,9 +239,9 @@
     \vspace*{\fill}%
   }%
   \cleardoublepage%
-  \microtypesetup{protrusion=false}%
+  % \microtypesetup{protrusion=false}%
   \tableofcontents%  
-  \microtypesetup{protrusion=true}%
+  % \microtypesetup{protrusion=true}%
 }
 
 \AtBeginDocument{%
