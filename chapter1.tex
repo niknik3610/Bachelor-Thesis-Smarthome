@@ -14,8 +14,36 @@ interested in connecting their proprietary device to an open source platform
 build their own device and then connect it to an open source hub. In fulfilling 
 this goal, to build an open source platform for both devices and the hub they 
 will connect to, there are multiple objectives that will need to be met along 
-the way.
-\begin{itemize}
+the way:
+\begin{enumerate}
+    \item Create a Library and API (Application Programming Interface) for 
+        building smart home devices.
+    \item Build a Server with an API for the smart home devices to communicate 
+        with. This will act as a hub and will control clients connected to it.
+         \begin{enumerate}
+             \item This API should be well documented, so a user can interact 
+                 with the hub, without using the Library.
+         \end{enumerate}
+     \item Create a frontend, which will be populated with devices currently 
+         connected to the smart home. It will also be used to control clients 
+         connected to the server.
+         \begin{enumerate}
+             \item The API provided by the server for this frontend should also 
+                 be easy to use, so the user can create their own frontend 
+                 environment.
+         \end{enumerate}
+     \item The code of all of the above should be hosted in a public repository, 
+         with instructions for how to build and use every component of the 
+         system.
+         \begin{enumerate}
+             \item An appropriate license should also be selected for this 
+                 repository, so the code within it can be copied or modified by 
+                 third parties.
+             \item This repository should provide important links and provide 
+                 information on the inner workings of the system, to support 
+                 interested parties.
+         \end{enumerate}
+\end{enumerate}
     
 
 \begin{lstlisting}[language=Rust, style=colouredRust, caption=Rust Example]
