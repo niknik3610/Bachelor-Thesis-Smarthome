@@ -1,14 +1,36 @@
 \chapter{Background} \label{cha:chapter2}
 
-\section{Servers and Smart Home Hubs} \label{sec:chap2:servers}
+\section{IoT System Architectures} \label{sec:chap2:servers}
+Kamienski et al. describe a simple three layer architecture of an IoT system in
+\cite{DesigningOpenIotSystem}. Within this architecture, the top layer is the 
+"Input System", from which any data that will influence the decisions of the 
+IoT system will come from. Included in this are sensors, but also user facing 
+interfaces. The second layer, known as the "Process System", is where any 
+algorithms are run and system behavioral decisions are made. The goal of this 
+layer is to gain an "improved understanding of the system where the  data comes 
+from" \cite{DesigningOpenIotSystem}. The bottom layer is the "Output System", 
+which are where decisions made by the Process System will be enacted. This is 
+often represented as the devices connected to the IoT system.
+
+This three layer architecture is expanded upon by Bansal and Kumar within 
+\cite{IotEcosystemSurvey}, where three more architectures are described which 
+expand upon the ideas within the three layer architecture. They are however more 
+specialized than the three layer architecture. The first of these is a 
+"Middleware Based" architecture, which can take many forms, but is usually 
+combined with another type of architecture, with a middleware layer. The 
+different types are described in detail by Zhang et al. in 
+\cite{MiddlewareIOTSurvey}. The second is known as a "Fog Based" architecture, 
+where certain tasks, usually those with less processing requirements, are 
+calculated on device to reduce latency. More computationally expensive tasks are 
+however calculated on a server in the cloud \cite{IoTArchitectures}.
+
+The most relevant architecture in relation to this report is known as a "Service 
+Based" architecture.
+
+
 \section{Smart Home Devices} \label{sec:chap2:devices}
 \section{Frontend control of Smart Homes} \label{sec:chap2:frontend}
 \section{Security} \label{sec:chap2:security}
 \section{Networking} \label{sec:chap2:networking}
 \section{Open Source and Licensing} \label{sec:chap2:opensource}
- 
 
-Remember to always refer to chapters, sections, figures, tables,
-\ldots correctly. That is, you might want to refer to something in the
-former chapter by saying something like ``as mentioned in
-Chapter~\ref{cha:intro} \ldots'', ``as mentioned in
