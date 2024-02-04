@@ -24,9 +24,20 @@ where certain tasks, usually those with less processing requirements, are
 calculated on device to reduce latency. More computationally expensive tasks are 
 however calculated on a server in the cloud \cite{IoTArchitectures}.
 
-The most relevant architecture in relation to this report is known as a "Service 
-Based" architecture.
-
+The most relevant architecture to this report is known as a "Service Based" 
+architecture (SBA). The SBA is defined around the concept of the Service 
+Oriented Architectural (SOA) style\cite{InteractingSoaBasedIot} of software 
+design. SOA is defined by the Open Group Foundation as an "architectural style 
+that supports service-orientation", where a service is a "logical representation 
+of a repeatable business activity that has a specified 
+outcome"\cite{SoaSourceBook}. Each service is a "black box" any device 
+interacting with it. Other devices use interfaces and API endpoints to make 
+requests to the service and receive a result. A SOA is comprised of many 
+different services. In SBA, services are used to offer device functionality 
+using interfaces, often using web based concepts such as SOAP or REST 
+APIs\cite{TrustManagementSoaIot}. This allows devices with different 
+capabilities and purposes to interact with the same system, allowing for an IoT 
+system that is more flexible.
 
 \section{Smart Home Devices} \label{sec:chap2:devices}
 \section{Frontend control of Smart Homes} \label{sec:chap2:frontend}
