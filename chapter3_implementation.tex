@@ -1,6 +1,44 @@
 \chapter{Implementation} \label{cha:chapter3}
 
+\section{Technology Choices} \label{sec:chap3:technology}
+This section will discuss choices that have been made throughout the project regarding technology used and justifications for their usage.
+
+\subsection{Rust} \label{sec:chap3:technology:rust}
+There were a few requirements when choosing an appropriate programming language for this project:
+\begin{enumerate} 
+    \item Performance: There are two aspects to performance within this project. Performance considerations and optimization are vital on IOT devices themselves, due to their limited on-board processing power. On the other hand, while performance on servers is definitely important, it is significantly easier to scale server-performance, by simply adding more servers (horizontal scaling) or by improving the hardware of any individual server (vertical scaling), than it is to improve performance of an IoT device. This is especially true of an IoT device that is already deployed.
+    \item Stability: Another important requirement when choosing a language is the stability of code written in the language. This does not necessarily mean that code written in that language, or running on a runtime in that language, is inherently unstable, however it is more of a consideration about if the language enables and encourages a programmer to write code that is memory-safe and handles errors correctly. This is important in an IoT environment, as devices are expected to run for long periods. What is the point of a security camera if it's software crashes every couple days, due to an obscure memory out of bounds error? 
+    \item Security: While no language is inherently "hack-proof" or secure, there are ways a language can encourage behaviors that can lead to better outcomes in security. A blog-post by the "Microsoft Security Response Centre" states that 70\% of all vulnerabilities assigned a CVE (Common Vulnerabilities and Exposures) each year are due to memory corruption errors \cite{ProactiveApproachToSecureCode}. In the post the languages "C" and "C++" are specifically referred to as being part of this problem. As mentioned in subsection ~\ref{sec:chap2:security}, security is of particular importance in smart home systems, so ensuring a method or language that enables secure code is chosen is of particular importance. 
+    \item Ease of Use and Comfort: While not particularly important in the final product, having a language that is easy to develop in can make the developer experience easier and can lead to faster iteration on ideas, perhaps leading to a better final result. That being said, developer familiarity with a language can more than make up this difference. A seasoned C++ developer will be able to iterate faster and produce a better product in C++, than if they are using an "easy" language, that they are not as familiar with.
+\end{enumerate}\todo{not sure I like the list style here}
+\subsection{gRPC} \label{sec:chap3:technology:grpc}
+\subsection{Typescript \& VueJS} \label{sec:chap3:technology:ts}
+\subsection{Raspberry Pi} \label{sec:chap3:technology:raspi}
+
+
 \section{Server \& Hub} \label{sec:chap3:server}
+\subsection{Server Start Up} \label{sec:chap3:server:startup}
+\begin{lstlisting}[language=Rust, style=boxed]
+#[derive(clap::Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    ///Run an additional JSON frontend api endpoint, all json requests get routed to main GRPC
+    #[arg(long, default_value_t = false)]
+    json_frontend: bool,
+}
+
+const DEFAULT_PORT: u16 = 2302;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let args = Args::parse();
+
+    let port = DEFAULT_PORT;
+    let grpc_address = SocketAddr::new(local_ip, port);
+\end{lstlisting}
+\subsection{Device Registration} \label{sec:chap3:server:registration}
+
+
 \subsection{Security} \label{sec:chap3:server:security}
 
 \subsection{Threads \& Concurrency} \label{sec:chap3:server:threads}
@@ -9,7 +47,7 @@
 
 \section{Device Library} \label{sec:chap3:devicelib}
 \section{Example Device} \label{sec:chap3:deviceexample}
-\todo{Perhaps add a section about networking here, talk about different things 
-tried}
+\section{Networking}
+
 \section{Web \& CLI Frontend} \label{sec:chap3:frontend}
 \section{Open Source} \label{sec:chap3:opensource}
