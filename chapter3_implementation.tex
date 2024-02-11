@@ -11,6 +11,10 @@ There were a few requirements when choosing an appropriate programming language 
     \item Security: While no language is inherently "hack-proof" or secure, there are ways a language can encourage behaviors that can lead to better outcomes in security. A blog-post by the "Microsoft Security Response Centre" states that 70\% of all vulnerabilities assigned a CVE (Common Vulnerabilities and Exposures) each year are due to memory corruption errors \cite{ProactiveApproachToSecureCode}. In the post the languages "C" and "C++" are specifically referred to as being part of this problem. As mentioned in subsection ~\ref{sec:chap2:security}, security is of particular importance in smart home systems, so ensuring a method or language that enables secure code is chosen is of particular importance. 
     \item Ease of Use and Comfort: While not particularly important in the final product, having a language that is easy to develop in can make the developer experience easier and can lead to faster iteration on ideas, perhaps leading to a better final result. That being said, developer familiarity with a language can more than make up this difference. A seasoned C++ developer will be able to iterate faster and produce a better product in C++, than if they are using an "easy" language, that they are not as familiar with.
 \end{enumerate}\todo{not sure I like the list style here}
+After some deliberation, the language that was chosen for this project was Rust. While C/C++'s performance rivals and often surpasses rust, the difference is often quite marginal \cite{PerformanceEvalOnMicrocontroller}, due to all three being compiled to machine code. What makes Rust different, is its headline feature, known as the "borrow checker". While the details of the borrow checker are out of scope of this paper, it can ensure that at compile-time, the code is memory safe. While there are ways to circumvent this (using the "unsafe" keyword), this has to be explicitly done. Due to the code being guaranteed memory safe at compile time, outside the aforementioned unsafe blocks, Rust code is known for its ability to run long-term without running into crashes. Additionally, Rust code is a popular choice for embedded devices, due to being able to compile without a standard library (this has to be enabled), giving it flexibility in a project such as this.
+
+I have decided to use Rust for both the Server and Clients. While Rust might be a somewhat obvious choice for IoT clients, it is less so for servers. Due to the "borrow checker", while Rust might be safe, it is often said to be harder to write than traditional languages. This makes it more questionable as the primary language for the server, due to it being a less constrained platform (view performance section above). While servers are theoretically almost infinitely horizontally scalable, in practice this is often not the case, especially in a smart-home's case, as they have to fit in someone's home and generally should be affordable. Therefore ensuring that the server can run on as many devices as possible, be it a Raspberry-Pi, or a modern desktop, is an important goal to strive for. The "difficulty" aspect of Rust can be largely counteracted by personal familiarity with the language. Additionally, having a stable server is very important, especially since all IoT devices will need to frequently communicate with this server, an aspect which Rust excels at. For these reasons I have chosen Rust as the primary programming language of the Server and Client parts of this project.
+
 \subsection{gRPC} \label{sec:chap3:technology:grpc}
 \subsection{Typescript \& VueJS} \label{sec:chap3:technology:ts}
 \subsection{Raspberry Pi} \label{sec:chap3:technology:raspi}
@@ -18,7 +22,7 @@ There were a few requirements when choosing an appropriate programming language 
 
 \section{Server \& Hub} \label{sec:chap3:server}
 \subsection{Server Start Up} \label{sec:chap3:server:startup}
-\begin{lstlisting}[language=Rust, style=boxed]
+\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]
 #[derive(clap::Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -32,6 +36,12 @@ const DEFAULT_PORT: u16 = 2302;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
+
+    let local_ip = local_ip().map_err(|e| {
+        eprintln!("Error getting local ip address
+                  You can try setting it manually using --set-ip:{{ip}}"); 
+        return e;
+    })?;
 
     let port = DEFAULT_PORT;
     let grpc_address = SocketAddr::new(local_ip, port);
