@@ -59,7 +59,7 @@
 % Reference control
 %\RequirePackage[numbers,sort&compress,square,comma]{natbib}
 \usepackage[square,sort,comma,numbers]{natbib}
-\bibliographystyle{abbrv}
+\bibliographystyle{plain}
 
 \typearea[current]{calc} % force page layout recalculation after
                          % changing all the fonts
