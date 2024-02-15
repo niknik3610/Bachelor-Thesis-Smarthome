@@ -27,6 +27,18 @@ in both native and containerized tests. In fact, gRPC was the most performant in
 Due to its performance and cross-language support I have chosen gRPC as the internet communication protocol for this project. The specific library used for this project is known as "Tonic". Tonic is a gRPC crate that includes both a gRPC server and client. It also utilizes "prost" to compile protobuf files into Rust code, without having to interface the protobuf compiler itself. All protobuf files are compiled as a compilation step of the server and client, eliminating the need for build scripts.
 
 \subsection{Typescript \& VueJS} \label{sec:chap3:technology:ts}
+While a Command Line Interface (CLI) frontend, written in Rust, will be made available, the main focus will be on the Graphical User Interface (GUI). To ensure that it can run on a variety of systems and is relatively easy to create it will be web based, using Javascript at runtime. However, it will be written in Typescript. Typescript is a superset of Javascript, that compiles to Javascript and leaves no trace of types behind. Typescript provides a robust type-system, including, but not limited to \cite{understandingTypescript}:
+\begin{itemize}
+    \item Structural type equivalence, instead of Javascript's by-name type equivalence
+    \item Types and concepts for object-based programming
+    \item Type operators
+\end{itemize}
+All of these, while not guaranteeing that the program will be type-safe at runtime, help a developer design more robust and long term solutions generally associated with statically typed languages.
+
+In conjunction with Typescript a web-development framework will be used. Web frameworks are libraries for Javascript that allow easier development of websites, sometimes with vastly different syntaxes from standard Javascript. Most of the choice between different web-frameworks comes down to personal preference and familiarity with a framework. That being said there can be performance differences between different frameworks, that could make a difference on some systems. While there is a lack of formal experiments on framework performance, an informal experiment \cite{performanceComparisonJS} showed that while there is a performance difference between different frameworks, it should not be the primary decision maker. When the difference when creating 1000 rows between vanilla JavaScript and VueJS is 32 milliseconds, the disparity will not be noticeable to a user.
+
+In a survey \cite{adoptionOfJSFrameworks}, Javascript developers were asked on their choices of framework, 78.6\% decided on VueJS because it was easy to use. In addition to this, due to a large amount of personal experience with the framework I have decided
+
 \subsection{Raspberry Pi} \label{sec:chap3:technology:raspi}
 
 
