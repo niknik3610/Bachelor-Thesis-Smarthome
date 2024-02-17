@@ -181,28 +181,32 @@ Once we have added all services to the Server struct. We can then "await" the gR
 
 The JSON HTTP server (view ~\ref{sec:chap3:frontend:json}) works almost the same, using the same builder pattern. View part of the "run\_json\_frontend" function, found in the file \textbf{\textit{backend/src/server/server.rs}} below:
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
-    let result = actix_web::HttpServer::new(move || {
-        let cors = actix_cors::Cors::permissive();
-        App::new()
-            .app_data(web::Data::new(json_state.clone()))
-            .wrap(cors)
-            .service(json_registration::json_registration)
-            .service(json_registration::json_registration_options)
-            .service(json_get_devices::json_get_connected_devices)
-            .service(json_get_devices
-                ::json_get_connected_devices_options
-            )
-            .service(json_device_control::json_device_control)
-            .service(json_device_control
-                ::json_device_control_options
-            )
-    })
-    .bind(JSON_ADDRESS)?
-    .run();
+const JSON_ADDRESS: &str = "localhost:50052";
 
-    println!("Successfully Started JSON API Layer on {JSON_ADDRESS}");
+let result = actix_web::HttpServer::new(move || {
+    let cors = actix_cors::Cors::permissive();
+    actix_web::app::App::new()
+        .app_data(web::Data::new(json_state.clone()))
+        .wrap(cors)
+        .service(json_registration::json_registration)
+        .service(json_registration::json_registration_options)
+        .service(json_get_devices::json_get_connected_devices)
+        .service(json_get_devices
+            ::json_get_connected_devices_options
+        )
+        .service(json_device_control::json_device_control)
+        .service(json_device_control
+            ::json_device_control_options
+        )
+})
+.bind(JSON_ADDRESS)?
+.run();
+
+println!("Successfully Started JSON API Layer on {JSON_ADDRESS}");
 \end{lstlisting}
-Due to this builder function requiring more Rust specific knowledge to understand, it will be simplified here. It is functionally the same as the one seen from Tonic. To host this HTTP server we are using the popular crate named "Actix", a self described "powerful, pragmatic, and extremely fast web framework for Rust" \cite{actixWebsite}.
+Due to this builder function requiring more Rust specific knowledge to understand, it will be simplified here. It is functionally the same as the one seen from Tonic. To host this HTTP server we are using the popular crate named "Actix", a self-described "powerful, pragmatic, and extremely fast web framework for Rust" \cite{actixWebsite}. First we create a new HTTPServer struct from the actix\_web module, while handing it a callback function. We then again add services with the service method on the App struct from the app module and returns it to the HTTPServer struct. To view an example of these services, view subsection~\ref{sec:chap3:frontend:json}. From there we bind this server to the constant string JSON\_ADDRESS. This is an IP Address defined at compile time, the definition however is found above the web server. The server is running on localhost, as it is meant for communication with the web frontend.
+
+Apart from creating service structs and parsing command-line arguments, instantiating and running the gRPC and HTTP server are the main things done at startup. For code beyond the above provided snippets view the file \textbf{\textit{backend/src/server/server.rs}}, which contains the main function for the server.
 \subsection{Device Registration} \label{sec:chap3:server:registration} 
 
 
@@ -217,4 +221,8 @@ Due to this builder function requiring more Rust specific knowledge to understan
 
 \section{Web \& CLI Frontend} \label{sec:chap3:frontend}
 \subsection{Using JSON for the Frontend API} \label{sec:chap3:frontend:json}
+Write about here:
+- Show Json service in Rust
+- Why its bound on localhost
+- Why protobuf compiler needs Serialize and Deserialize on these structs
 \section{Open Source} \label{sec:chap3:opensource}
