@@ -46,7 +46,7 @@ Most of the choice between different web-frameworks comes down to personal prefe
 Due to the server being the largest part of this project, and practically being a requirement for testing the client and frontend functionality, this will be focused on first. This section will describe defining and compiling protobuf files for API endpoints, server startup, how IOT devices are registered, security mechanisms and how concurrency was handled within the server. 
 
 \subsection{Protocol Buffers \& GRPC} \label{sec:chap3:server:protoBufs}
-Protobufs are defined within ".proto" files. They use a fairly basic syntax, where the user can define services (functions that can be used in an RPC) using the "service" keyword. You can also define the arguments this function takes and what it returns. Structs are defined using the "message" keyword, where each field is separated by a semicolon. Fields can have multiple modifiers, including optional, repeated and map. Repeated marks a field as possibly being a list, or array structure. Map marks a field as being a map data structure. Finally, messages from other files can be imported, using the import keyword and then giving the file-name. For an example of a protobuf file view \textbf{\textit{protos/iot/registrationService.proto}}:
+Protobufs are defined within ".proto" files. They use a fairly basic syntax, where the user can define a service using the "service" keyword. A service can contain many functions which a client can call, these are defined using the "rpc" keyword. You can also define the arguments this function takes and what it returns. Structs are defined using the "message" keyword, where each field is separated by a semicolon. Fields can have multiple modifiers, including optional, repeated and map. Repeated marks a field as possibly being a list, or array structure. Map marks a field as being a map data structure. Finally, messages from other files can be imported, using the import keyword and then giving the file-name. \cite{protobufDocs} For an example of a protobuf file view \textbf{\textit{protos/iot/registrationService.proto}}:
 
 \begin{lstlisting}[language=protobuf3, style=boxed]{iot/registrationService.proto}
 syntax = "proto3";
@@ -70,10 +70,45 @@ message RegistrationResponse {
 }
 \end{lstlisting}
 
-Here we define a service called 
+Here we define a service called "RegistrationService", with a function called Register. This function is called by IOT clients when they first attempt to connect to the server which takes a RegistrationRequest as a parameter and returns a RegistrationResponse. The file also defines two "messages", the aforementioned RegistrationRequest and RegistrationResponse. While most of the fields within them are fairly obvious, RegistrationRequest.capabilities warrants further explanation.
+    This field is repeated, meaning it is an array data structure. This array contains the type DeviceCapabilityStatus, which is defined in iot.types. We can see this type is imported at the top of the file, from "types.proto". This is the definition of DeviceCapabilityStatus:
+
+\begin{lstlisting}[language=protobuf3, style=boxed]{iot/types.proto}
+message DeviceCapabilityStatus {
+    bool available = 1;
+    string capability = 2;
+}
+\end{lstlisting}
+
+In summary, if an IOT device wants to register with this server, they will need to call the Register server stub. The server stub takes one parameter, the RegistrationRequest message. This message requires the client to give it's public key, it's display name and an array of "DeviceCapabilityStatus". The Register function then returns a RegistrationResponse. 
+
+To compile these server stubs to Rust we will be using the aforementioned Rust "Tonic" crate. To do this first we must add the "Tonic" crate to our project, then add "tonic-build" to our build dependencies (view Cargo Documentation). We then create a build.rs file, which is run when the Rust compiler (Cargo) builds the program. You can view this file (\textit{backend/build.rs}) below:
+
+\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{backend/build.rs}
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tonic_build::compile_protos("../proto/iot/types.proto")?;
+    tonic_build::compile_protos("../proto/iot/registrationService.proto")?;
+    tonic_build::compile_protos("../proto/iot/requestUpdateService.proto")?;
+    tonic_build::compile_protos("../proto/iot/deviceControlService.proto")?;
+
+    tonic_build::configure()
+        .type_attribute(".", "#[derive(serde::Deserialize, serde::Serialize)]")
+        .compile(
+            &[
+                "../proto/frontend/registrationService.proto",
+                "../proto/frontend/frontendTypes.proto",
+                "../proto/iot/types.proto",
+                "../proto/frontend/deviceControlService.proto",
+            ],
+            &["../proto/frontend", "../proto/iot"],
+        )?;
+    Ok(())
+}
+\end{lstlisting}
+
+In line 2-5 we are telling tonic\_build, using prost under the hood (which in turn calls the protobuf compiler), to compile the files required for Device \& Server communication. We do this by calling the \textit{compile\_protos} function. The files in the folder \textit{"proto/iot"} are the ones used by IOT devices. This is quite simple to use, however is technically a build script, making the statement in subsection~\ref{sec:chap3:technology:grpc} partially untrue. Line 7-17 are where frontend protobuf files are compiled. These require the traits (Rust equivalent to interfaces in other languages) "Serialize" and "Deserialize" to be implemented for all structs compiled from the files. We therefore require this special syntax when compiling them. For more information on why they need these traits, view subsection~\ref{sec:chap3:frontend:json}.
 
 \subsection{Server Start Up} \label{sec:chap3:server:startup}
-
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]
 #[derive(clap::Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -111,4 +146,5 @@ async fn main() -> anyhow::Result<()> {
 \section{Networking}
 
 \section{Web \& CLI Frontend} \label{sec:chap3:frontend}
+\subsection{Using JSON for the Frontend API} \label{sec:chap3:frontend:json}
 \section{Open Source} \label{sec:chap3:opensource}
