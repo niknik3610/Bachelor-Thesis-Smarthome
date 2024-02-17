@@ -1,5 +1,7 @@
 \chapter{Implementation} \label{cha:chapter3}
 
+\todo{split chapter section into design \& implementation}
+
 \section{Technology Choices} \label{sec:chap3:technology}
 This section will discuss choices that have been made throughout the project regarding technology used and justifications for their usage.
 
@@ -204,12 +206,83 @@ let result = actix_web::HttpServer::new(move || {
 
 println!("Successfully Started JSON API Layer on {JSON_ADDRESS}");
 \end{lstlisting}
-Due to this builder function requiring more Rust specific knowledge to understand, it will be simplified here. It is functionally the same as the one seen from Tonic. To host this HTTP server we are using the popular crate named "Actix", a self-described "powerful, pragmatic, and extremely fast web framework for Rust" \cite{actixWebsite}. First we create a new HTTPServer struct from the actix\_web module, while handing it a callback function. We then again add services with the service method on the App struct from the app module and returns it to the HTTPServer struct. To view an example of these services, view subsection~\ref{sec:chap3:frontend:json}. From there we bind this server to the constant string JSON\_ADDRESS. This is an IP Address defined at compile time, the definition however is found above the web server. The server is running on localhost, as it is meant for communication with the web frontend.
+Due to this builder function requiring more Rust specific knowledge to understand, it will be simplified here. It is functionally the same as the one seen from Tonic. To host this HTTP server we are using the popular crate named "Actix", a self-described "powerful, pragmatic, and extremely fast web framework for Rust" \cite{actixWebsite}. First we create a new HTTPServer struct from the actix\_web module, while handing it a callback function. We then again add services with the service method on the App struct from the app module and returns it to the HTTPServer struct. To view an example of these services, view subsection~\ref{sec:chap3:server:registration}. From there we bind this server to the constant string JSON\_ADDRESS. This is an IP Address defined at compile time, the definition however is found above the web server. The server is running on localhost, as it is meant for communication with the web frontend.
 
 Apart from creating service structs and parsing command-line arguments, instantiating and running the gRPC and HTTP server are the main things done at startup. For code beyond the above provided snippets view the file \textbf{\textit{backend/src/server/server.rs}}, which contains the main function for the server.
+
 \subsection{Device Registration} \label{sec:chap3:server:registration} 
+This subsection serves three purposes: to show how a service/server-stub is implemented within Rust, how the JSON server communicates with the gRPC server-stubs and to provide an explanation of how device registration is handled by the server. For this purpose it will show two Registration code snippets, first the gRPC service, then the JSON service. View the code-snippet below from \textbf{\textit{backend/src/server/registration.rs}}:
 
+\begin{lstlisting}[language=Rust, style=boxed]{server/registration.rs}
+pub type ThreadSafeMutable<T> = Arc<tokio::sync::Mutex<T>>;
+pub struct ClientRegistrationHandler {
+    connected_devices: ThreadSafeMutable<ConnectedDevicesType>,
+    connected_device_uuids: ThreadSafeMutable<Vec<String>>,
+    signing_service: certificate_signing
+        ::CertificateSigningService,
+    _public_key: rsa::RsaPublicKey,
+    string_public_key: String,
+    _device_count: ThreadSafeMutable<u128>,
+    frontend_cache_valid: ThreadSafeMutable<bool>,
+}
+\end{lstlisting}
+While this struct looks fairly complex at first glance, with a little bit of understanding it is easy to understand. Within this snippet we create a new struct named the ClientRegistrationHandler. This struct is prefixed with the "pub" keyword, meaning it is accessible from outside this "module" (or file in this case). In Rust everything is private by default, unless prefixed with a pub keyword. The same goes for fields within the struct. These are all private, so they cannot be accessed from the outside. The only way to access these fields is through methods implemented on the struct. Additionally, some of the types used within the struct should be talked about. 
+\begin{itemize}
+    \item Arc - an atomic reference counting pointer. A reference counting pointer, is a pointer to a piece of memory on the heap, with a counter attached to it. For every instance of that pointer that currently exists, this counter is incremented. Every time the pointer goes out of scope the counter is decremented. Once the counter hits 0, meaning there are no more instances of the Arc, the memory within the pointer gets freed. The atomic part of the Arc simply means that it can be shared across threads safely, as incrementing this counter is an atomic (uninterruptible) operation, preventing race conditions. A non-atomic Rc also exists in Rust.
+    \item Mutex - A primitive used for mutual exclusion, a common programming concept to prevent race conditions in concurrent/parallel tasks. Only one task at a time can access memory within a Rust Mutex.
+    \item ThreadSafeMutable - a custom type defined on line five. This combines an Arc and Mutex, which enables safe sharing of data between threads. When a task wants to access the memory within the ThreadSafeMutable, it must first dereference the Arc (usually done automatically in Rust), then  lock the Mutex. This ensures that only one task can use this memory at a time. If the locked Mutex goes out of scope, the Mutex is free to be used again by a different task.
+    \item Vec - a Vector, otherwise known as a resizable array.
+    \item u128 - an unsigned 128-bit integer
+\end{itemize}
+The underscore prefix in front of fields, simply indicate to the Rust compiler that certain fields are currently not in use, but will eventually be used. This silences a compiler warning.
+\begin{lstlisting}[language=Rust, style=boxed]{server/registration.rs}
+use self::registration_service
+    ::registration_service_server::RegistrationService;
 
+#[async_trait]
+impl RegistrationService for ClientRegistrationHandler {
+    async fn register(
+        &self,
+        request: tonic::Request<
+            self::registration_service::RegistrationRequest
+        >,
+    ) -> RPCFunctionResult<
+        self::registration_service::RegistrationResponse
+    > {
+        let request = request.into_inner();
+        let client_id: Uuid = generate_new_id();
+
+        let csr = client_id.to_string() + &request.public_key;
+        let new_certificate = 
+            self.signing_service.sign_certificate(csr);
+
+        let capabilites = request.capabilities;
+
+        let device_public_key: rsa::RsaPublicKey =
+            serde_json::from_str(&request.public_key).unwrap();
+
+        let (active_capabilities, inactive_capabilities) = 
+            capabilites
+            .into_iter()
+            .partition(|capability| capability.available);
+
+        let device = device::Device::new(
+            request.name,
+            active_capabilities,
+            inactive_capabilities,
+            client_id,
+            device_public_key,
+        );
+
+        let response = registration_service::RegistrationResponse {
+            public_key: self.string_public_key.clone(),
+            client_id: device.stringified_uuid.clone(),
+            certificate: new_certificate.await,
+        };
+        return Ok(tonic::Response::new(response));
+    }
+}
+\end{lstlisting}
 \subsection{Security} \label{sec:chap3:server:security}
 
 \subsection{Threads \& Concurrency} \label{sec:chap3:server:threads}
