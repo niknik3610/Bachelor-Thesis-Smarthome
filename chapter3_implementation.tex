@@ -45,7 +45,7 @@ Most of the choice between different web-frameworks comes down to personal prefe
 \section{Server \& Hub} \label{sec:chap3:server}
 Due to the server being the largest part of this project, and practically being a requirement for testing the client and frontend functionality, this will be focused on first. This section will describe defining and compiling protobuf files for API endpoints, server startup, how IOT devices are registered, security mechanisms and how concurrency was handled within the server. 
 
-\subsection{Protocol Buffers \& GRPC} \label{sec:chap3:server:protoBufs}
+\subsection{Protocol Buffers and Tonic} \label{sec:chap3:server:protoBufs}
 Protobufs are defined within ".proto" files. They use a fairly basic syntax, where the user can define a service using the "service" keyword. A service can contain many functions which a client can call, these are defined using the "rpc" keyword. You can also define the arguments this function takes and what it returns. Structs are defined using the "message" keyword, where each field is separated by a semicolon. Fields can have multiple modifiers, including optional, repeated and map. Repeated marks a field as possibly being a list, or array structure. Map marks a field as being a map data structure. Finally, messages from other files can be imported, using the import keyword and then giving the file-name. \cite{protobufDocs} For an example of a protobuf file view \textbf{\textit{protos/iot/registrationService.proto}}:
 
 \begin{lstlisting}[language=protobuf3, style=boxed]{iot/registrationService.proto}
@@ -119,32 +119,58 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 \end{lstlisting}
 
-In line 2-5 we are telling tonic\_build, using prost under the hood (which in turn calls the protobuf compiler), to compile the files required for Device \& Server communication. We do this by calling the \textit{compile\_protos} function. The files in the folder \textit{"proto/iot"} are the ones used by IOT devices. This is quite simple to use, however is technically a build script, making the statement in subsection~\ref{sec:chap3:technology:grpc} partially untrue. Line 7-17 are where frontend protobuf files are compiled. These require the traits (Rust equivalent to interfaces in other languages) "Serialize" and "Deserialize" to be implemented for all structs compiled from the files. We therefore require this special syntax when compiling them. For more information on why they need these traits, view subsection~\ref{sec:chap3:frontend:json}.
+In line 2-13 we are telling tonic\_build, using prost under the hood (which in turn calls the protobuf compiler), to compile the files required for Device \& Server communication. We do this by calling the \textit{compile\_protos} function. The files in the folder \textit{"proto/iot"} are the ones used by IOT devices. This is quite simple to use, however is technically a build script, making the statement in subsection~\ref{sec:chap3:technology:grpc} partially untrue. Line 15-28 are where frontend protobuf files are compiled. These require the traits (Rust equivalent to interfaces in other languages) "Serialize" and "Deserialize" to be implemented for all structs compiled from the files. We therefore require this special syntax when compiling them. For more information on why they need these traits, view subsection~\ref{sec:chap3:frontend:json}.
+
+Finally, protobuf server-stubs and messages can be imported into Rust using a macro provided by tonic. View below how \textit{"backend/server/registration.rs"} imports the \textit{"protos/iot/registration.proto"} file:
+
+\begin{lstlisting}[language=Rust, style=boxed]{server/registration.rs}
+use crate::types::types;
+pub mod registration_service {
+    tonic::include_proto!("iot.registration");
+}
+\end{lstlisting}
+
+In order to import the compiled protbuf file, we simply call the "include\_proto" macro (it being a macro is indicated by the \textbf{!}). Note that we need to import the types module first, as this module contains the compiled \textit{"protos/iot/types.proto"} file, which is imported by \textit{"registration.proto"}. Additionally, instead of giving the file path to the protobuf file, we simply give the module name, which is also defined in the protobuf file.
 
 \subsection{Server Start Up} \label{sec:chap3:server:startup}
-\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]
-#[derive(clap::Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    ///Run an additional JSON frontend api endpoint, all json requests get routed to main GRPC
-    #[arg(long, default_value_t = false)]
-    json_frontend: bool,
-}
+\todo{maybe add a section on how cli arguments are parsed if i need more words (probably not)}
 
-const DEFAULT_PORT: u16 = 2302;
+This subsection details what the server handles at startup, including starting the GRPC server, creating server stubs and creating a JSON web server (again, for an explanation on why this is necessary view subsection~\ref{sec:chap3:frontend:json}).
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let args = Args::parse();
+\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
+let grpc_server = Server::builder()
+    .add_service(
+        registration_service_server
+            ::RegistrationServiceServer::new(
+                registration_service,
+        )
+    )
+    .add_service(
+        request_update_service_server
+            ::RequestUpdateServiceServer::new(
+                polling_service,
+        )
+    )
+    .add_service(
+        frontend_registration_service_server
+            ::FrontendRegistrationServiceServer::new(
+                frontend_registration_service,
+        ),
+    )
+    .add_service(
+        frontend_device_control_service_server
+            ::FrontendDeviceControlServiceServer::new(
+                device_control_service,
+        ),
+    )
+    .serve_with_shutdown(
+        grpc_address,
+        tokio::signal::ctrl_c().map(drop)
+    );
 
-    let local_ip = local_ip().map_err(|e| {
-        eprintln!("Error getting local ip address
-                  You can try setting it manually using --set-ip:{{ip}}"); 
-        return e;
-    })?;
+println!("Started GRPC Server on {}", grpc_address);
 
-    let port = DEFAULT_PORT;
-    let grpc_address = SocketAddr::new(local_ip, port);
+let grpc_handle = tokio::spawn(async move { grpc_server.await });
 \end{lstlisting}
 \subsection{Device Registration} \label{sec:chap3:server:registration}
 
