@@ -203,7 +203,7 @@ println!("Started GRPC Server on {}", grpc_address);
 \end{lstlisting}
 \textit{Note that the above code snippet is abbreviated for readability, it is however still valid Rust code and gives a good representation of what is done in server.rs.} 
 
-The Server struct we are instantiating on line 1 comes from the transport module within the tonic crate. We invoke the builder method on the Server struct, a very common pattern within the Rust ecosystem. In fact, the same pattern is used instantiate a new IoT device in the client library for this project (view section~\ref{sec:chap3:devicelib}). After invoking the builder method, which returns a new Server struct, we add structs that implement the aforementioned services to it, using the "add\_service" method. In our case, we want to hand it a "RegistrationServiceServer" struct, provided by the protobuf file. The "new" method on the "RegistrationServiceServer" takes one argument, which is a struct that implements the "RegistrationService" trait, which is the trait we implemented on our ClientRegistrationHandler earlier. We therefore hand it an instance of the "ClientRegistrationHandler", held in the variable "registration\_service".
+The Server struct we are instantiating on line 1 comes from the transport module within the tonic crate. We invoke the builder method on the Server struct, a very common pattern within the Rust ecosystem. In fact, the same pattern is used instantiate a new IoT device in the client library for this project (view section~\ref{sec:chap3:devicelib}). After invoking the builder method, which returns a new Server struct, we add structs that implement the aforementioned services to it, using the "add\_service" method. In our case, we want to hand it a "RegistrationServiceServer" struct, provided by the protobuf file. The "new" method on the "RegistrationServiceServer" takes one argument, which is a struct that implements the "RegistrationService" trait, which is the trait we implemented on our ClientRegistrationHandler earlier. We therefore hand it the variable "registration\_service" which is of the type "ClientRegistrationHandler".
 
 The "server\_with\_shutdown" method consumes the Server struct and runs the server, on the address handed to it in the parameter. In this case it is the variable "grpc\_address", which is a string which contains the device's IP address and a port. The second parameter simply tells Rust to drop the gRPC server (shutdown and gracefully free the memory associated with it) when the key combination crtl-c is pressed. This is an easy way to implement this behavior in Rust when working with multiple threads (view subsection~\ref{sec:chap3:server:threads}).
 
@@ -232,6 +232,14 @@ Due to this builder function requiring more Rust specific knowledge to understan
 For code beyond the above provided abbreviated snippets view the file \textbf{\textit{backend/src/server/server.rs}}, which contains the main function for the server.
 
 \subsection{Device Registration} \label{sec:chap3:server:registration} 
+This section will give an overview of the server's response to a device registration attempt. For information about how registration is performed on a device, view subsection~\ref{sec:chap3:devicelib:registration}
+
+Figure~\ref{fig:server_registration} shows the process of the server receiving a registration request from a client:
+\begin{figure}[h]
+\caption{Simplified Diagram of Device Registration}
+\includegraphics[width=\textwidth]{device_registration}
+\label{fig:server_registration}
+\end{figure}
 
 \subsection{Security} \label{sec:chap3:server:security}
 
@@ -239,6 +247,7 @@ For code beyond the above provided abbreviated snippets view the file \textbf{\t
 
 
 \section{Device Library} \label{sec:chap3:devicelib}
+\subsection{Device Registration} \label{sec:chap3:devicelib:registration}
 \section{Example Device} \label{sec:chap3:deviceexample}
 \section{Networking}
 
