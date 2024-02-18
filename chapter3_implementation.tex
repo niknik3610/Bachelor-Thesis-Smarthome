@@ -283,7 +283,77 @@ pub struct Device {
 The structure of a device is quite self explanatory, the only thing of note is having the UUID as two fields, one time as the Uuid struct and once as a string. This is due to the type conversion being done very often in certain sections of code, it made sense to do this conversion once and reuse it.  
     Note that in the current system, a device needs to re-register every time the server restarts. It doesn't need to re-register on device restart, as long as the certificate and UUID are retained. An easy way for the server to save devices, so they can be remembered after restarting would be to serialize the hash map which maps UUIDs to Device structs and then to load this at startup. However, this would require more advanced logic to decide when to kick inactive devices out of the hash map and could lead to unforeseen bugs. Therefore, it is another possible extension of the project for the future.
 
-\subsection{Server \& Device Communication}
+\subsection{Device \& Server Communication}
+Device and Server communication happens through polling. Every 0.5 seconds the device sends a request through the "RequestUpdateService" to the server. The service is defined in the \textit{\textbf{/protos/iot/requestUpdateService.proto}} file:
+\begin{lstlisting}[language=protobuf3, style=boxed, showstringspaces=false]{}
+service RequestUpdateService {
+    rpc PollForUpdate(PollRequest) returns (PollResponse);
+};
+
+message PollRequest {
+    string certificate = 1;
+    string uuid = 2;
+    repeated iot.types.DeviceCapabilityStatus 
+        updatedCapabilities = 3;
+};
+
+message PollResponse {
+    PollingOption hasUpdate = 1;
+    repeated Update updates = 2;
+};
+
+enum PollingOption {
+    UNKNOWN = 0;
+    NONE = 1;
+    SOME = 2;
+    DEVICE_NOT_FOUND = 3;
+}
+
+message Update {
+    string capability = 1;
+    bool hasValue = 2;
+    int32 value = 3;
+}
+\end{lstlisting}
+The "RequestUpdateService" has one function, named "PollForUpdate". It accepts a "PollRequest" as a parameter and returns a "PollResponse". When a device requests an update from the server, it must provide it's UUID and certificate, so the server knows what device is requesting and so the server can ensure that the device is who it says it is. Additionally, it provides it's updated list of capabilities. Below is some pseudocode to show how the server creates a response (you can view the real function in file \textit{\textbf{backend/src/server/polling.rs}}):
+
+\begin{lstlisting}[language=Python, style=boxed, showstringspaces=false]{}
+def poll_for_update(self, request):
+    device = self.connected_devices.get(request.uuid)
+    if device == null:
+        return PollResponse(
+            has_update: PollingOption::DeviceNotFound,
+            updates: [],
+        )
+
+    if !request.updatedCapabilities.is_empty():
+        active_capabilities, inactive_capabilities = (
+            request.updatedCapabilities.partition(
+                (capability) => capability.available == True
+            )
+        )
+        device.replace_capabilities(
+            active_capabilities,
+            inactive_capabilities
+        )
+
+        self.frontend_cache_valid = false
+
+    updates = self.updates.get(request.uuid)
+    if updates.is_empty():
+        return PollResponse(
+            has_update: NONE,
+            updates: [],
+        )
+
+    updates_clone = updates.clone()
+    updates.clear()
+
+    return PollResponse(
+        has_update: SOME,
+        updates: updates_clone
+    )
+\end{lstlisting}
 
 \subsection{Security} \label{sec:chap3:server:security}
 
