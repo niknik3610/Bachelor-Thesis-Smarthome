@@ -85,7 +85,7 @@ message DeviceCapabilityStatus {
 }
 \end{lstlisting}
 
-In summary, if an IOT device wants to register with this server, they will need to call the Register server stub. The server stub takes one parameter, the RegistrationRequest message. This message requires the client to give it's public key, it's display name and an array of "DeviceCapabilityStatus". The Register function then returns a RegistrationResponse. 
+In summary, if an IOT device wants to register with this server, they will need to call the Register server stub. The server stub takes one parameter, the RegistrationRequest message. This message requires the client to give it's public key, it's display name and an array of "DeviceCapabilityStatus". The Register function then returns a RegistrationResponse. For more information on this topic, view subsection~\ref{sec:chap3:server:registration}
 
 To compile these server stubs to Rust we will be using the aforementioned Rust "Tonic" crate. To do this first we must add the "Tonic" crate to our project, then add "tonic-build" to our build dependencies (view Cargo Documentation). We then create a build.rs file, which is run when the Rust compiler (Cargo) builds the program. You can view the file \textbf{\textit{backend/build.rs}} below:
 
@@ -235,11 +235,55 @@ For code beyond the above provided abbreviated snippets view the file \textbf{\t
 This section will give an overview of the server's response to a device registration attempt. For information about how registration is performed on a device, view subsection~\ref{sec:chap3:devicelib:registration}
 
 Figure~\ref{fig:server_registration} shows the process of the server receiving a registration request from a client:
+
 \begin{figure}[h]
 \caption{Simplified Diagram of Device Registration}
 \includegraphics[width=\textwidth]{device_registration}
 \label{fig:server_registration}
 \end{figure}
+When a device wants to connect to the server, it uses the "Register" function from the "RegistrationService" through gRPC. To do so, it must first create a "RegistrationRequest", the contents of which are detailed within the \textit{\textbf{proto/iot/registration.proto}} protobuf file:
+\pagebreak
+\begin{lstlisting}[language=protobuf3, style=boxed, showstringspaces=false]{}
+message RegistrationRequest {
+    string public_key = 1;
+    string name = 2;
+    repeated iot.types.DeviceCapabilityStatus capabilities = 3;
+}
+
+//from proto/iot/types.proto
+message DeviceCapabilityStatus {
+    bool available = 1;
+    string capability = 2;
+}
+\end{lstlisting}
+This is the same protobuf code detailed in subsection~\ref{sec:chap3:server:protoBufs}. The "RegistrationRequest" contains the device's public key and its display name. The public key will be used for encryption and signing, the name is what the device is called on the frontend-interface. The final field is an array of type "DeviceCapabilityStatus", which is a message (struct) with two fields. A capability in this system represents something the device can do. This takes the form of a string. If a capability is available, that means the server relays that capability to any frontend devices connected to the server. If it is not available, the server still keeps that information, but does not relay it to frontends. 
+
+A simple example of a capability is one for a lamp. A lamp could have two capabilities, "turn on" and "turn off". If the lamp is off, the capability "turn on" is available to the user. If the user decides to invoke that capability, the lamp will turn on, the "turn on" capability will no longer be available and the "turn off" capability will become available. 
+
+This system has much room for extension, with some glaring features that need to be added being:
+\begin{itemize}
+    \item Optional variables attached, such as a float value. Could be used for turning up a speaker for example.
+\todo{still planning to implement this before deadline, add more stuff here}
+    \item Access levels, only an admin can see this capability.
+\end{itemize}
+
+The device sends this registration request to the server. With the information from the request, the server can then register the device in a HashMap, which maps the device UUID to the Device struct, following the steps described in figure~\ref{fig:server_registration}. The Device struct is defined in \textit{\textbf{/backend/src/server/device.rs}} as:
+\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
+use crate::types::types::DeviceCapabilityStatus;
+#[derive(Clone)]
+pub struct Device {
+    pub name: String,
+    pub uuid: Uuid,
+    pub stringified_uuid: String,
+    pub active_capabilities: Vec<DeviceCapabilityStatus>,
+    pub inactive_capabilities: Vec<DeviceCapabilityStatus>,
+    pub device_public_key: rsa::RsaPublicKey,
+}
+\end{lstlisting}
+The structure of a device is quite self explanatory, the only thing of note is having the UUID as two fields, one time as the Uuid struct and once as a string. This is due to the type conversion being done very often in certain sections of code, it made sense to do this conversion once and reuse it.  
+    Note that in the current system, a device needs to re-register every time the server restarts. It doesn't need to re-register on device restart, as long as the certificate and UUID are retained. An easy way for the server to save devices, so they can be remembered after restarting would be to serialize the hash map which maps UUIDs to Device structs and then to load this at startup. However, this would require more advanced logic to decide when to kick inactive devices out of the hash map and could lead to unforeseen bugs. Therefore, it is another possible extension of the project for the future.
+
+\subsection{Server \& Device Communication}
 
 \subsection{Security} \label{sec:chap3:server:security}
 
