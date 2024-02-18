@@ -48,6 +48,7 @@ Most of the choice between different web-frameworks comes down to personal prefe
 Due to the server being the largest part of this project, and practically being a requirement for testing the client and frontend functionality, this will be focused on first. This section will describe defining and compiling protobuf files for API endpoints, server startup, how IOT devices are registered, security mechanisms and how concurrency was handled within the server. 
 
 \subsection{Protocol Buffers and Tonic} \label{sec:chap3:server:protoBufs}
+\todo{I think this section is probably fine, just talk some more about what these protobufs and method stubs will be used for}
 Protobufs are defined within ".proto" files. They use a fairly basic syntax, where the user can define a service using the "service" keyword. A service can contain many functions which a client can call, these are defined using the "rpc" keyword. You can also define the arguments this function takes and what it returns. Structs are defined using the "message" keyword, where each field is separated by a semicolon. Fields can have multiple modifiers, including optional, repeated and map. Repeated marks a field as possibly being a list, or array structure. Map marks a field as being a map data structure. Finally, messages from other files can be imported, using the import keyword and then giving the file-name. \cite{protobufDocs} For an example of a protobuf file view \textbf{\textit{protos/iot/registrationService.proto}}:
 
 \begin{lstlisting}[language=protobuf3, style=boxed]{iot/registrationService.proto}
@@ -135,47 +136,72 @@ pub mod registration_service {
 In order to import the compiled protbuf file, we simply call the "include\_proto" macro (it being a macro is indicated by the \textbf{!}). Note that we need to import the types module first, as this module contains the compiled \textit{protos/iot/types.proto} file, which is imported by \textit{registration.proto}. Additionally, instead of giving the file path to the protobuf file, we simply give the module name, which is also defined in the protobuf file.
 
 \subsection{Server Start Up} \label{sec:chap3:server:startup}
-\todo{maybe add a section on how cli arguments are parsed if i need more words (probably not)}
+This section will describe what is done when the server first starts. It will give a general overview of startup and the details of starting a gRPC and HTTP server in Rust. For more details, view the main function within \textit{\textbf{/backend/src/server/server.rs}}.
 
-This subsection details what the server handles at startup, including starting the GRPC server, creating server stubs and creating a JSON web server (again, for an explanation on why this is necessary view subsection~\ref{sec:chap3:frontend:json}). Below you can see how I instantiate a new gRPC server instance within \textbf{\textit{backend/src/server/server.rs}}:
+Startup of the server is currently quite simple:
 
+\begin{figure}[h]
+\caption{Simplified Diagram of Server Startup}
+\includegraphics[width=\textwidth]{server_startup}
+\end{figure}
+
+Command line (CLI) arguments are parsed using a Rust library called "Clap". Currently the only commandline argument that can be passed is running the optional HTTP server, which enables using JSON for the frontend (view subsection~\ref{sec:chap3:frontend:json}), however there are plans to include other arguments, such as giving an IP address or Port for the gRPC server to run on as an argument. Currently, the computer's IP address is discovered automatically using a crate called "local-ip-address". 
+
+Next gRPC services are instantiated. GRPC services in Rust take the form of structs that implement the trait (interface) defined as a service within a protbuf file. Take for example, the "RegistrationService" from \textbf{\textit{protos/iot/registrationService.proto}}, defined in subsection~\ref{sec:chap3:server:protoBufs}:
+\pagebreak
+\begin{lstlisting}[language=protobuf3, style=boxed, showstringspaces=false]{}
+service RegistrationService {
+    rpc Register(
+        RegistrationRequest
+    ) returns (RegistrationResponse);
+};
+\end{lstlisting}
+
+This is implemented on a struct in Rust like this (code snippet from \textit{\textbf{backend/src/server/registration.rs}}):
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
+use self::registration_service
+    ::registration_service_server::RegistrationService;
+
+#[async_trait]
+impl RegistrationService for ClientRegistrationHandler {
+    async fn register(
+        &self,
+        request: tonic::Request<
+            self::registration_service::RegistrationRequest
+        >,
+    ) -> RPCFunctionResult<
+        self::registration_service::RegistrationResponse
+    > {
+        //code goes here
+    }
+}
+\end{lstlisting}
+
+Where "RegistrationService" is the trait we are implementing and "ClientRegistrationHandler" is the name of the struct it is being implemented on. If the trait is implemented correctly, this struct is now a service and, after being handed to the gRPC server struct, this function can then be called using an RPC through gRPC. In other words, any gRPC client that is connected to this gRPC server can now call this function, as long as their programming language supports it.
+
+After implementing all services defined in the protobuf files on appropriate structs, the gRPC server can now be started. This is done in the following code snippet from \textit{\textbf{/backend/src/server/server.rs}}:
+\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
+use registration_service_server::RegistrationServiceServer;
+
+let registration_service =
+    registration::ClientRegistrationHandler::new();
 let grpc_server = tonic::transport::Server::builder()
     .add_service(
-        registration_service_server
-            ::RegistrationServiceServer::new(
-                registration_service,
+        RegistrationServiceServer::new(
+            registration_service,
         )
-    )
-    .add_service(
-        request_update_service_server
-            ::RequestUpdateServiceServer::new(
-                polling_service,
-        )
-    )
-    .add_service(
-        frontend_registration_service_server
-            ::FrontendRegistrationServiceServer::new(
-                frontend_registration_service,
-        ),
-    )
-    .add_service(
-        frontend_device_control_service_server
-            ::FrontendDeviceControlServiceServer::new(
-                device_control_service,
-        ),
     )
     .serve_with_shutdown(
         grpc_address,
         tokio::signal::ctrl_c().map(drop)
-    );
+    )
+    .await;
 
 println!("Started GRPC Server on {}", grpc_address);
-
-let grpc_handle = tokio::spawn(async move { grpc_server.await });
 \end{lstlisting}
+\textit{Note that the above code snippet is abbreviated for readability, it is however still valid Rust code and gives a good representation of what is done in server.rs.} 
 
-The Server struct comes from the tonic crate and transport module. We invoke the builder method on the Server struct, a very common pattern within the Rust ecosystem. In fact, the same pattern is used instantiate a new IoT device in the client library (view section~\ref{sec:chap3:devicelib}). After invoking the builder method, which returns a new Server struct, we add services to it. A service is simply an instance of a struct which implements a trait (interface) generated by the protobufs. For an example of this, view subsection~\ref{sec:chap3:server:registration}. These are created above the code snippet.
+The Server struct we are instantiating on line 1 comes from the transport module within the tonic crate. We invoke the builder method on the Server struct, a very common pattern within the Rust ecosystem. In fact, the same pattern is used instantiate a new IoT device in the client library for this project (view section~\ref{sec:chap3:devicelib}). After invoking the builder method, which returns a new Server struct, we add structs that implement the aforementioned services to it, using the "add\_service" method. This method takes in a "RegistrationServiceServer" struct, provided automatically by the protobuf file. The new method on the "RegistrationServiceServer" takes one argument, which is a struct that implements the "RegistrationService" trait, which is the trait we implemented on our ClientRegistrationHandler earlier. We therefore just hand it an instance of the "ClientRegistrationHandler", held in the variable "registration\_service".
 
 The "server\_with\_shutdown" method consumes the Server struct and runs the server, on the address handed to it in the parameter. In this case it is the variable "grpc\_address", which is a string containg the device's IP address and the user specified port. The second parameter simply tells Rust to drop the gRPC server (shutdown and gracefully free the memory associated with it) when the key combination crtl-c is pressed. This is an easy way to implement this behavior in Rust when working with multiple threads (view subsection~\ref{sec:chap3:server:threads}).
 
@@ -211,78 +237,7 @@ Due to this builder function requiring more Rust specific knowledge to understan
 Apart from creating service structs and parsing command-line arguments, instantiating and running the gRPC and HTTP server are the main things done at startup. For code beyond the above provided snippets view the file \textbf{\textit{backend/src/server/server.rs}}, which contains the main function for the server.
 
 \subsection{Device Registration} \label{sec:chap3:server:registration} 
-This subsection serves three purposes: to show how a service/server-stub is implemented within Rust, how the JSON server communicates with the gRPC server-stubs and to provide an explanation of how device registration is handled by the server. For this purpose it will show two Registration code snippets, first the gRPC service, then the JSON service. View the code-snippet below from \textbf{\textit{backend/src/server/registration.rs}}:
 
-\begin{lstlisting}[language=Rust, style=boxed]{server/registration.rs}
-pub type ThreadSafeMutable<T> = Arc<tokio::sync::Mutex<T>>;
-pub struct ClientRegistrationHandler {
-    connected_devices: ThreadSafeMutable<ConnectedDevicesType>,
-    connected_device_uuids: ThreadSafeMutable<Vec<String>>,
-    signing_service: certificate_signing
-        ::CertificateSigningService,
-    _public_key: rsa::RsaPublicKey,
-    string_public_key: String,
-    _device_count: ThreadSafeMutable<u128>,
-    frontend_cache_valid: ThreadSafeMutable<bool>,
-}
-\end{lstlisting}
-While this struct looks fairly complex at first glance, with a little bit of understanding it is easy to understand. Within this snippet we create a new struct named the ClientRegistrationHandler. This struct is prefixed with the "pub" keyword, meaning it is accessible from outside this "module" (or file in this case). In Rust everything is private by default, unless prefixed with a pub keyword. The same goes for fields within the struct. These are all private, so they cannot be accessed from the outside. The only way to access these fields is through methods implemented on the struct. Additionally, some of the types used within the struct should be talked about. 
-\begin{itemize}
-    \item Arc - an atomic reference counting pointer. A reference counting pointer, is a pointer to a piece of memory on the heap, with a counter attached to it. For every instance of that pointer that currently exists, this counter is incremented. Every time the pointer goes out of scope the counter is decremented. Once the counter hits 0, meaning there are no more instances of the Arc, the memory within the pointer gets freed. The atomic part of the Arc simply means that it can be shared across threads safely, as incrementing this counter is an atomic (uninterruptible) operation, preventing race conditions. A non-atomic Rc also exists in Rust.
-    \item Mutex - A primitive used for mutual exclusion, a common programming concept to prevent race conditions in concurrent/parallel tasks. Only one task at a time can access memory within a Rust Mutex.
-    \item ThreadSafeMutable - a custom type defined on line five. This combines an Arc and Mutex, which enables safe sharing of data between threads. When a task wants to access the memory within the ThreadSafeMutable, it must first dereference the Arc (usually done automatically in Rust), then  lock the Mutex. This ensures that only one task can use this memory at a time. If the locked Mutex goes out of scope, the Mutex is free to be used again by a different task.
-    \item Vec - a Vector, otherwise known as a resizable array.
-    \item u128 - an unsigned 128-bit integer
-\end{itemize}
-The underscore prefix in front of fields, simply indicate to the Rust compiler that certain fields are currently not in use, but will eventually be used. This silences a compiler warning.
-\begin{lstlisting}[language=Rust, style=boxed]{server/registration.rs}
-use self::registration_service
-    ::registration_service_server::RegistrationService;
-
-#[async_trait]
-impl RegistrationService for ClientRegistrationHandler {
-    async fn register(
-        &self,
-        request: tonic::Request<
-            self::registration_service::RegistrationRequest
-        >,
-    ) -> RPCFunctionResult<
-        self::registration_service::RegistrationResponse
-    > {
-        let request = request.into_inner();
-        let client_id: Uuid = generate_new_id();
-
-        let csr = client_id.to_string() + &request.public_key;
-        let new_certificate = 
-            self.signing_service.sign_certificate(csr);
-
-        let capabilites = request.capabilities;
-
-        let device_public_key: rsa::RsaPublicKey =
-            serde_json::from_str(&request.public_key).unwrap();
-
-        let (active_capabilities, inactive_capabilities) = 
-            capabilites
-            .into_iter()
-            .partition(|capability| capability.available);
-
-        let device = device::Device::new(
-            request.name,
-            active_capabilities,
-            inactive_capabilities,
-            client_id,
-            device_public_key,
-        );
-
-        let response = registration_service::RegistrationResponse {
-            public_key: self.string_public_key.clone(),
-            client_id: device.stringified_uuid.clone(),
-            certificate: new_certificate.await,
-        };
-        return Ok(tonic::Response::new(response));
-    }
-}
-\end{lstlisting}
 \subsection{Security} \label{sec:chap3:server:security}
 
 \subsection{Threads \& Concurrency} \label{sec:chap3:server:threads}
@@ -298,4 +253,3 @@ Write about here:
 - Show Json service in Rust
 - Why its bound on localhost
 - Why protobuf compiler needs Serialize and Deserialize on these structs
-\section{Open Source} \label{sec:chap3:opensource}

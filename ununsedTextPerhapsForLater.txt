@@ -1,0 +1,86 @@
+# Registration OLD:
+\todo{I dont think this section is very good, talk more theoretically how reg is done, less of this code}
+This subsection serves three purposes: to show how a service/server-stub is implemented within Rust, how the JSON server communicates with the gRPC server-stubs and to provide an explanation of how device registration is handled by the server. For this purpose it will show two Registration code snippets, first the gRPC service, then the JSON service. View the code-snippet below from \textbf{\textit{backend/src/server/registration.rs}}:
+
+\begin{lstlisting}[language=Rust, style=boxed]{server/registration.rs}
+pub type ThreadSafeMutable<T> = Arc<tokio::sync::Mutex<T>>;
+pub type ConnectedDevicesType = FxHashMap<String, device::Device>;
+
+pub struct ClientRegistrationHandler {
+    connected_devices: ThreadSafeMutable<ConnectedDevicesType>,
+    connected_device_uuids: ThreadSafeMutable<Vec<String>>,
+    signing_service: certificate_signing
+        ::CertificateSigningService,
+    _public_key: rsa::RsaPublicKey,
+    string_public_key: String,
+    _device_count: ThreadSafeMutable<u128>,
+    frontend_cache_valid: ThreadSafeMutable<bool>,
+}
+\end{lstlisting}
+While this struct looks fairly complex at first glance, with a little bit of understanding it is easy to understand. Within this snippet we create a new struct named the ClientRegistrationHandler. This struct is prefixed with the "pub" keyword, meaning it is accessible from outside this "module" (or file in this case). In Rust everything is private by default, unless prefixed with a pub keyword. The same goes for fields within the struct. These are all private, so they cannot be accessed from the outside. The only way to access these fields is through methods implemented on the struct. Additionally, some of the types used within the struct should be talked about. 
+\begin{itemize}
+    \item Arc - an atomic reference counting pointer. A reference counting pointer, is a pointer to a piece of memory on the heap, with a counter attached to it. For every instance of that pointer that currently exists, this counter is incremented. Every time the pointer goes out of scope the counter is decremented. Once the counter hits 0, meaning there are no more instances of the Arc, the memory within the pointer gets freed. The atomic part of the Arc simply means that it can be shared across threads safely, as incrementing this counter is an atomic (uninterruptible) operation, preventing race conditions. A non-atomic Rc also exists in Rust.
+    \item Mutex - A primitive used for mutual exclusion, a common programming concept to prevent race conditions in concurrent/parallel tasks. Only one task at a time can access memory within a Rust Mutex.
+    \item ThreadSafeMutable - a custom type defined on line five. This combines an Arc and Mutex, which enables safe sharing of data between threads. When a task wants to access the memory within the ThreadSafeMutable, it must first dereference the Arc (usually done automatically in Rust), then  lock the Mutex. This ensures that only one task can use this memory at a time. If the locked Mutex goes out of scope, the Mutex is free to be used again by a different task.
+    \item ConnectedDevicesType - a hash map mapping a string (the device UUID) to the device struct.This type is defined on line 6. This is using a FxHashmap, which is provided by the FxHash crate and is a faster implementation of the Rust hashmap.
+    \item Vec - a Vector, otherwise known as a resizable array.
+    \item u128 - an unsigned 128-bit integer
+\end{itemize}
+The underscore prefix in front of fields, simply indicates to the Rust compiler that certain fields are currently not in use, but will eventually be used. This silences a compiler warning.
+
+Next, the "RegistrationService" server stub needs to implemented for the ClientRegistrationHandler. This is provided by "Tonic", our gRPC runtime, as a trait (interface) that we can implement on a struct. View this implementation from \textbf{\textit{/backend/src/server/registration.rs}} below:
+\pagebreak
+\begin{lstlisting}[language=Rust, style=boxed]{server/registration.rs}
+use self::registration_service
+    ::registration_service_server::RegistrationService;
+
+#[async_trait]
+impl RegistrationService for ClientRegistrationHandler {
+    async fn register(
+        &self,
+        request: tonic::Request<
+            self::registration_service::RegistrationRequest
+        >,
+    ) -> RPCFunctionResult<
+        self::registration_service::RegistrationResponse
+    > {
+        let request = request.into_inner();
+        let client_id: Uuid = generate_new_id();
+
+        let csr = client_id.to_string() + &request.public_key;
+        let new_certificate = 
+            self.signing_service.sign_certificate(csr);
+
+        let capabilites = request.capabilities;
+
+        let device_public_key: rsa::RsaPublicKey =
+            serde_json::from_str(&request.public_key).unwrap();
+
+        let (active_capabilities, inactive_capabilities) = 
+            capabilites
+            .into_iter()
+            .partition(|capability| capability.available);
+
+        let device = device::Device::new(
+            request.name,
+            active_capabilities,
+            inactive_capabilities,
+            client_id,
+            device_public_key,
+        );
+
+        let response = registration_service::RegistrationResponse {
+            public_key: self.string_public_key.clone(),
+            client_id: device.stringified_uuid.clone(),
+            certificate: new_certificate.await,
+        };
+        return Ok(tonic::Response::new(response));
+    }
+}
+\end{lstlisting}
+
+The code above is slightly simplified from the actual implementation, to improve readability. Again this code snippet looks quite complicated at first glance, but is actually quite simple with some understanding. We are implementing the "RegistrationService" trait on the struct "ClientRegistrationHandler". This trait is the same one defined in subsection~\ref{sec:chap3:server:protoBufs}, within the protobuf file. As defined in the protobuf file, the RegistrationService has one function, called Register. Register takes a RegistrationRequest as a parameter and returns a RegistrationResponse. The only other variable that register takes, is a reference to the instance of the struct it is being executed on. This is indicated by the "\&self" parameter in the function signature, similarly to python. 
+
+
+
+
