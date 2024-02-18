@@ -145,10 +145,11 @@ Startup of the server is currently quite simple:
 \includegraphics[width=\textwidth]{server_startup}
 \end{figure}
 
+\subsubsection{Command Line Arguments}
 Command line (CLI) arguments are parsed using a Rust library called "Clap". Currently the only commandline argument that can be passed is running the optional HTTP server, which enables using JSON for the frontend (view subsection~\ref{sec:chap3:frontend:json}), however there are plans to include other arguments, such as giving an IP address or Port for the gRPC server to run on as an argument. Currently, the computer's IP address is discovered automatically using a crate called "local-ip-address". 
 
+\subsubsection{Creating gRPC Services}
 Next gRPC services are instantiated. GRPC services in Rust take the form of structs that implement the trait (interface) defined as a service within a protbuf file. Take for example, the "RegistrationService" from \textbf{\textit{protos/iot/registrationService.proto}}, defined in subsection~\ref{sec:chap3:server:protoBufs}:
-\pagebreak
 \begin{lstlisting}[language=protobuf3, style=boxed, showstringspaces=false]{}
 service RegistrationService {
     rpc Register(
@@ -179,6 +180,7 @@ impl RegistrationService for ClientRegistrationHandler {
 
 Where "RegistrationService" is the trait we are implementing and "ClientRegistrationHandler" is the name of the struct it is being implemented on. If the trait is implemented correctly, this struct is now a service and, after being handed to the gRPC server struct, this function can then be called using an RPC through gRPC. In other words, any gRPC client that is connected to this gRPC server can now call this function, as long as their programming language supports it.
 
+\subsubsection{Starting the gRPC Server}
 After implementing all services defined in the protobuf files on appropriate structs, the gRPC server can now be started. This is done in the following code snippet from \textit{\textbf{/backend/src/server/server.rs}}:
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
 use registration_service_server::RegistrationServiceServer;
@@ -201,40 +203,33 @@ println!("Started GRPC Server on {}", grpc_address);
 \end{lstlisting}
 \textit{Note that the above code snippet is abbreviated for readability, it is however still valid Rust code and gives a good representation of what is done in server.rs.} 
 
-The Server struct we are instantiating on line 1 comes from the transport module within the tonic crate. We invoke the builder method on the Server struct, a very common pattern within the Rust ecosystem. In fact, the same pattern is used instantiate a new IoT device in the client library for this project (view section~\ref{sec:chap3:devicelib}). After invoking the builder method, which returns a new Server struct, we add structs that implement the aforementioned services to it, using the "add\_service" method. This method takes in a "RegistrationServiceServer" struct, provided automatically by the protobuf file. The new method on the "RegistrationServiceServer" takes one argument, which is a struct that implements the "RegistrationService" trait, which is the trait we implemented on our ClientRegistrationHandler earlier. We therefore just hand it an instance of the "ClientRegistrationHandler", held in the variable "registration\_service".
+The Server struct we are instantiating on line 1 comes from the transport module within the tonic crate. We invoke the builder method on the Server struct, a very common pattern within the Rust ecosystem. In fact, the same pattern is used instantiate a new IoT device in the client library for this project (view section~\ref{sec:chap3:devicelib}). After invoking the builder method, which returns a new Server struct, we add structs that implement the aforementioned services to it, using the "add\_service" method. In our case, we want to hand it a "RegistrationServiceServer" struct, provided by the protobuf file. The "new" method on the "RegistrationServiceServer" takes one argument, which is a struct that implements the "RegistrationService" trait, which is the trait we implemented on our ClientRegistrationHandler earlier. We therefore hand it an instance of the "ClientRegistrationHandler", held in the variable "registration\_service".
 
-The "server\_with\_shutdown" method consumes the Server struct and runs the server, on the address handed to it in the parameter. In this case it is the variable "grpc\_address", which is a string containg the device's IP address and the user specified port. The second parameter simply tells Rust to drop the gRPC server (shutdown and gracefully free the memory associated with it) when the key combination crtl-c is pressed. This is an easy way to implement this behavior in Rust when working with multiple threads (view subsection~\ref{sec:chap3:server:threads}).
+The "server\_with\_shutdown" method consumes the Server struct and runs the server, on the address handed to it in the parameter. In this case it is the variable "grpc\_address", which is a string which contains the device's IP address and a port. The second parameter simply tells Rust to drop the gRPC server (shutdown and gracefully free the memory associated with it) when the key combination crtl-c is pressed. This is an easy way to implement this behavior in Rust when working with multiple threads (view subsection~\ref{sec:chap3:server:threads}).
 
-Once we have added all services to the Server struct. We can then "await" the gRPC server handle on another thread. For more information on how this works, view subsection~\ref{sec:chap3:server:threads}.  
+Once we have added all services to the Server struct, it must be awaited using the "await" keyword. For more information on how this works view subsection~\ref{sec:chap3:server:threads}.  
 
-The JSON HTTP server (view ~\ref{sec:chap3:frontend:json}) works almost the same, using the same builder pattern. View part of the "run\_json\_frontend" function, found in the file \textbf{\textit{backend/src/server/server.rs}} below:
+\subsubsection{Starting the HTTP Server}
+Starting the HTTP server works almost the same as the gRPC server, using the same builder pattern. However, this time instead of using the Tonic crate, we are using a crate named "Actix", a self-described "powerful, pragmatic, and extremely fast web framework for Rust" \cite{actixWebsite}. View part of the "run\_json\_frontend" function, found in the file \textbf{\textit{backend/src/server/server.rs}} below:
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
 const JSON_ADDRESS: &str = "localhost:50052";
 
 let result = actix_web::HttpServer::new(move || {
-    let cors = actix_cors::Cors::permissive();
     actix_web::app::App::new()
         .app_data(web::Data::new(json_state.clone()))
-        .wrap(cors)
         .service(json_registration::json_registration)
-        .service(json_registration::json_registration_options)
-        .service(json_get_devices::json_get_connected_devices)
-        .service(json_get_devices
-            ::json_get_connected_devices_options
-        )
-        .service(json_device_control::json_device_control)
-        .service(json_device_control
-            ::json_device_control_options
-        )
 })
 .bind(JSON_ADDRESS)?
-.run();
+.run()
+.await;
 
 println!("Successfully Started JSON API Layer on {JSON_ADDRESS}");
 \end{lstlisting}
-Due to this builder function requiring more Rust specific knowledge to understand, it will be simplified here. It is functionally the same as the one seen from Tonic. To host this HTTP server we are using the popular crate named "Actix", a self-described "powerful, pragmatic, and extremely fast web framework for Rust" \cite{actixWebsite}. First we create a new HTTPServer struct from the actix\_web module, while handing it a callback function. We then again add services with the service method on the App struct from the app module and returns it to the HTTPServer struct. To view an example of these services, view subsection~\ref{sec:chap3:server:registration}. From there we bind this server to the constant string JSON\_ADDRESS. This is an IP Address defined at compile time, the definition however is found above the web server. The server is running on localhost, as it is meant for communication with the web frontend.
+\textit{Note that the above code snippet is abbreviated for readability, it is however still valid Rust code and gives a good representation of what is done in server.rs.} 
 
-Apart from creating service structs and parsing command-line arguments, instantiating and running the gRPC and HTTP server are the main things done at startup. For code beyond the above provided snippets view the file \textbf{\textit{backend/src/server/server.rs}}, which contains the main function for the server.
+Due to this builder function requiring more Rust specific knowledge to understand, it will be simplified here. It is functionally the same as the one seen from Tonic. First we create a new HTTPServer struct from the actix\_web module. We then hand it our services using the "service" method. What is different here, is that we are actually handing it callback functions, instead of structs with traits implemented. To view an example of these services, view subsection~\ref{sec:chap3:server:registration}. From there we bind this server to the constant string JSON\_ADDRESS. This is an IP Address defined at compile time, the definition however is found above the web server. The server is running on localhost, as it is meant for communication with the web frontend. We then call the run method and await the result. In reality the server is being awaited on a different thread than the gRPC server, so the two can run concurrently, this is not shown in the above code snippet. 
+
+For code beyond the above provided abbreviated snippets view the file \textbf{\textit{backend/src/server/server.rs}}, which contains the main function for the server.
 
 \subsection{Device Registration} \label{sec:chap3:server:registration} 
 
