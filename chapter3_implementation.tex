@@ -149,6 +149,8 @@ Startup of the server is currently quite simple:
 \includegraphics[width=\textwidth]{server_startup}
 \end{figure}
 
+\todo{fix the ot word}
+
 \subsubsection{Command Line Arguments}
 Command line (CLI) arguments are parsed using a Rust library called "Clap". Currently the only commandline argument that can be passed is running the optional HTTP server, which enables using JSON for the frontend (view subsection~\ref{sec:chap3:frontend:json}), however there are plans to include other arguments, such as giving an IP address or Port for the gRPC server to run on as an argument. Currently, the computer's IP address is discovered automatically using a crate called "local-ip-address". 
 
@@ -481,7 +483,7 @@ The "Client Handler" has some other useful functions which the user can call. So
     \item Set\_server\_ip - While the IP can simply be set in the config and is read at runtime, it can instead of be passed using this function. This allows the user to programatically determine the IP address, for example using network discovery.
 \end{itemize}
 
-These methods can be useful, but are not required for using the library. Once all callbacks have been and other additional user parameters have been added, the run method is called. The run method accepts the configuration (obtained through the load\_config function) for the device as a paramter and returns a future, which must be awaited using the await keyword (view subsection~\ref{sec:chap3:server:threads}). This allows the ClientHandler to be used concurrently to any other tasks the client has to perform.
+These methods can be useful, but are not required for using the library. Once all callbacks have been and other additional user parameters have been added, the run method is called. The run method accepts the configuration (obtained through the load\_config function) for the device as a paramter and returns a future, which must be awaited using the await keyword (view subsection~\ref{sec:chap3:server:threads}). This allows the ClientHandler to be used concurrently to any other tasks the client has to perform. \todo{add a smaller blurb about what the ClientHandler does internally}
 
 \subsubsection{Callback Functions}
 Finally, the callback functions, used in the "add\_callback" method on the ClientHandler are defined. The ClientHandler struct defines a callback to be a function that accepts two parameters and returns void (defined as no return value in rust). The first parameter must be a Struct that implements the interface State, which the ClientHandler uses to infer the type of State. The second parameter must be of type Request. This is a simple struct that is currently not in use, but will be used in the future for the frontend to pass specific parameters to the client. For example, a slider's value on the frontend could be passed within the Request parameter. As mentioned, this is not implemented yet.
