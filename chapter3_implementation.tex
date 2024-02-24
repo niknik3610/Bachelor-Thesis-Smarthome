@@ -371,11 +371,11 @@ When the client receives the response to their poll, they can then decide what t
 \subsection{Threads \& Concurrency} \label{sec:chap3:server:threads}
 
 
-\section{Device Library} \label{sec:chap3:devicelib}
-Another goal of this project was to create a library that can be used by other programmers, to easily create an IoT device that can connect to this system. This library was written for use with Rust. It is published within the Rust library ecosystem website, found at \textit{crates.io}. The library entry on \textit{crates.io} can be found be at \textbf{\href{https://crates.io/crates/NOSHP-Client}{here}}. 
+\section{Device Library \& Example Device} \label{sec:chap3:devicelib}
+Another goal of this project was to create a library that can be used by other programmers, to easily create an IoT device that can connect to this system. This library was written for use with Rust. It is published within the Rust library ecosystem website, found at \textit{crates.io}. The library entry on \textit{crates.io} can be found be \textbf{\href{https://crates.io/crates/NOSHP-Client}{here}}. 
 
 \subsection{Using the Library}
-The main purpose of the library to is to abstract details of how the client \& server connection works away from the programmer. While they can still view the source code, due to it being open source, they should not need to know the inner workings of the library to be able to use it. The example below, which can be found within the documentation for the \textbf{\href{https://docs.rs/NOSHP-Client/0.1.9/NOSHP_Client/}{client-library}}, demonstrates usage of the library to create a simple IoT device. The purpose of this device is to turn a LED, attached to a general purpose input output (GPIO) pin on and off, when the appropriate event is received. This code is made to run on a Raspberry Pi and will therefore not run on non Raspberry Pi Devices. It uses a combination of the NOSHP\_Client library (the library created within this paper) and rrpal, a library commonly used to interact with the Raspberry Pi's GPIO in Rust. View the entire code for this simple IoT device below: 
+The main purpose of the library to is to abstract details of how the client \& server connection works away from the programmer. While they can still view the source code due to it being open source, they should not need to know the inner workings of the library to be able to use it. The example below, which can be found within the repository for the example device \textbf{\href{https://github.com/niknik3610/Example-Iot-Device}{here}}, demonstrates usage of the library to create a simple IoT device. The purpose of this device is to toggle an LED, attached to a general purpose input output (GPIO) pin, on and off when the appropriate event is received. This code is made to run on a Raspberry Pi and will therefore not run on non Raspberry Pi Devices. It uses a combination of the NOSHP\_Client library (the library created within this paper) and rrpal, a library commonly used to interact with the Raspberry Pi's GPIO in Rust. View the entire code for this simple IoT device and an in depth explanation of it below: 
 
 \pagebreak
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
@@ -430,7 +430,7 @@ fn turn_off_led(state: &mut ExampleState, req: Request) {
 \end{lstlisting}
 
 \subsubsection{State}
-On line 8 the state struct of the program is defined. State will later be shared between callback functions. This can be defined by the user to fit their needs. The only requirement is that the user defined state struct must implement two interfaces. The first is called "State" and is imported on line 2 from the NOSHP\_Client library (our library). This State interface is currently empty, it has no required functions, it exists to make future additions to the library easier to integrate. If it is decided that a function is required on the state struct, it can be easily added to the interface and the user will get a compile time error that is easy to understand. The second interface is called Default. It simply defines the default implementation of the struct, in this case constructing a new "ExampleState", with the "led\_pin" field set to the appropriate GPIO pin (defined on line 24), which the LED is connected to. This will then later be used by callback functions (view Callback Functions), to turn on the LED, without having to construct a new GPIO struct every time.
+On line 8 the state struct of the program is defined. State will later be shared between callback functions. This can be defined by the user to fit their needs. The only requirement is that the user defined state struct must implement two interfaces. The first is called "State" and is imported on line 2 from the NOSHP\_Client library (our library). This State interface is currently empty, it has no required functions, it exists to make future additions to the library easier to integrate. If it is decided that a function is required on the state struct, it can be easily added to the interface and the user will get a compile time error that is easy to understand. The second interface is called Default. It simply defines the default implementation of the struct, in this case constructing a new "ExampleState" (the name of our State struct), with the "led\_pin" field set to the appropriate GPIO pin (defined on line 24), in this case where the pin the LED is connected to. This will then later be used by callback functions (view Callback Functions), to turn on the LED, without having to construct a new GPIO struct every time.
 
 \subsubsection{Configuration}
 Next we will have a look at the main function. On line 28 the configuration for the client is loaded from a file. This file is defined in a constant on line 25, under \textit{./example\_config.toml}. The configuration files for the client library are written in Tom's Obvious Minimal Language (TOML), a language often used in Rust projects. Its usage is similar to languages such as JSON or YAML (Yet another markup language). The configuration file looks like this:
@@ -447,7 +447,7 @@ server_ip = "http://192.168.0.0:2302"
 \end{lstlisting}
 This configuration is loaded using the "load\_config" method from our library, imported on line 3. 
 \subsubsection{ClientHandler}
-On line 31, we finally construct the client handler, by calling the "new" method on the "ClientHandler" struct, imported our library on line 2. Calling the new method initializes the variables inside the ClientHandler, including calling the default method on our State. This might be confusing to someone who is new to Rust, as we never informed the ClientHandler of the ExampleState struct. In this case Rust uses type inference, to infer what struct we are trying to use as our client's state. It infers this information from the callback functions we pass to it using the "add\_callback" method, as they define one of their parameters to be "ExampleState". If we were to remove these calls to "add\_callback", Rust would throw an error at compilation, stating that we need to specify the type of State. The definition of "ClientHandler" looks like this (from \textit{\textbf{client\_library/src/client.rs}}):
+On line 31, we finally construct the client handler, by calling the "new" method on the "ClientHandler" struct, imported from our library on line 2. Calling the new method initializes the variables inside the ClientHandler, including calling the default method on our State. This might be confusing to someone who is new to Rust, as we never informed the ClientHandler of the ExampleState struct. In this case Rust uses type inference, to infer what struct we are trying to use as our client's state. It infers this information from the callback functions we pass to it using the "add\_callback" method, as they define one of their parameters to be "ExampleState". If we were to remove these calls to "add\_callback", Rust would throw an error at compilation, stating that we need to specify the type of State. The definition of "ClientHandler" looks like this (from \textit{\textbf{client\_library/src/client.rs}}):
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
 pub type Callback<S: State> = fn(&mut S, Request);
 pub struct ClientHandler<S: State> {
@@ -456,8 +456,7 @@ pub struct ClientHandler<S: State> {
     server_ip: Option<String>,
 }
 \end{lstlisting}
-
-ClientHandler is a struct that accepts one generic arguments, named S. S needs to implement the interface State (which in turn requires an implementation of the interface Default). "ClientHandler" has three fields:
+ClientHandler is a struct that accepts one generic argument, named S. S needs to implement the interface State (which in turn requires an implementation of the interface Default). "ClientHandler" has three fields:
 \begin{itemize}
     \item Callbacks - A hashmap used to map capabilities (stored as Strings), to user defined callback functions.
     \item State - Of type S, used to store the state of the program.
@@ -475,23 +474,52 @@ match callback {
     ),
 }
 \end{lstlisting}
-In summary this snippet gets the callback, if the callback is defined by the user we call it, otherwise \textit{"Received signal to Turn On"} (for the capability "Turn On") is printed.
+In summary, this snippet gets the callback from the callbacks hashmap defined on the ClientHandler, if the callback is defined by the user we call it, otherwise \textit{"Received signal to Turn On"} (for the capability "Turn On") is printed.
 
 The "Client Handler" has some other useful functions which the user can call. Some examples of these are:
 \begin{itemize}
-    \item Set\_state - Allows the user to set the state of the program to the non-default implementation. Can be useful if the state is determined programatically, for example where the device is located.
-    \item Set\_server\_ip - While the IP can simply be set in the config and is read at runtime, it can instead of be passed using this function. This allows the user to programatically determine the IP address, for example using network discovery.
+    \item Set\_state - Allows the user to set the state of the program to the non-default implementation. Can be useful if the state is determined programatically. This could allow the machine to change behavior at runtime. An example of this is having different behaviour depending on where the device is located.
+    \item Set\_server\_ip - While the IP can simply be set in the config and read at runtime, it can instead of be passed using this function. This allows the user to programmatically determine the IP address, for example using network discovery to discover the IP address of the server, instead of using static IPs like in this example.
 \end{itemize}
 
 These methods can be useful, but are not required for using the library. Once all callbacks have been and other additional user parameters have been added, the run method is called. The run method accepts the configuration (obtained through the load\_config function) for the device as a paramter and returns a future, which must be awaited using the await keyword (view subsection~\ref{sec:chap3:server:threads}). This allows the ClientHandler to be used concurrently to any other tasks the client has to perform. \todo{add a smaller blurb about what the ClientHandler does internally}
 
 \subsubsection{Callback Functions}
-Finally, the callback functions, used in the "add\_callback" method on the ClientHandler are defined. The ClientHandler struct defines a callback to be a function that accepts two parameters and returns void (defined as no return value in rust). The first parameter must be a Struct that implements the interface State, which the ClientHandler uses to infer the type of State. The second parameter must be of type Request. This is a simple struct that is currently not in use, but will be used in the future for the frontend to pass specific parameters to the client. For example, a slider's value on the frontend could be passed within the Request parameter. As mentioned, this is not implemented yet.
+Finally, the callback functions, used in the "add\_callback" method on the ClientHandler are defined. The ClientHandler struct accepts callback functions, that accept two parameters and return void (defined as having no return value in rust). The first parameter must be a Struct that implements the interface State, which the "ClientHandler" uses to infer the type of State in the above example. The second parameter must be of type Request. This is a simple struct that is currently not in use, but will be used in the future for the frontend to pass specific parameters to the client. For example, a slider's value on the frontend could be passed within the Request parameter. As mentioned, this is not implemented yet.
 
 The functions in this case are fairly simple. They use the GPIO pin stored within the ExampleState to turn on and off the LED connected to the GPIO pin, using the methods defined in the rppal library.
 
 \subsection{Device Registration} \label{sec:chap3:devicelib:registration}
-\section{Example Device} \label{sec:chap3:deviceexample}
+While device registration is described in detail within subsection~\ref{sec:chap3:server:registration}, how the library handles registration on the client side will be briefly touched upon within this section.
+
+While the code for client registration section is significantly more simple than that of the server registration, it has again been translated to pseudo code, to be consistent. The real code snippet can be found within \textit{\textbf{client\_library/src/client\_registration.rs}}: 
+\begin{lstlisting}[language=Python, style=boxed, showstringspaces=false]{}
+def register_self(
+    public_key,
+    capabilites,
+    device_name,
+    server_ip
+):
+    client = RegistrationServiceClient::connect(server_ip)
+    registration_request = 
+        new RegistrationRequest(name, public_key, capabilities)
+
+    response = client.register(registration_request)
+    return new ServerConnection(
+        response.client_id,
+        response.public_key,
+        response.certificate
+    )
+\end{lstlisting}
+The RegistrationServiceClient is the counterpart to the RegistrationServiceServer used by the gRPC server and is imported from the generated code from the RegistrationService protobuf file. We use the client returned by the "connect" method on the RegistrationServiceClient, to call the RPC method "register" (view subsection~\ref{sec:chap3:server:protoBufs}). This then returns the fields required for communication with the server. Finally, we return the ServerConnection struct which is a basic struct from the client library defined as:
+\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
+pub struct ServerConnection {
+    pub uuid: String,
+    pub server_pub_key: rsa::RsaPublicKey,
+    pub security_certificate: String,
+}
+\end{lstlisting}
+which stores information required for communication with the server. 
 \section{Networking}
 
 \section{Web \& CLI Frontend} \label{sec:chap3:frontend}
