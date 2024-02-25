@@ -367,14 +367,16 @@ Next the function checks if any events are available for the device in question.
 When the client receives the response to their poll, they can then decide what to do with the events they have received, the server does not define any behavior. It simply reports to the client any events that have happened. This choice was made to enable a programmer to better define device behaviour themselves and prevents issues with the server and device being out of sync about what behaviors are available. The downside of this, is that the server cannot guarantee to the frontend that anything has happened when a button is clicked. It also cannot give feedback until the event is processed by the IoT device. Another downside is that it leads to more calculation being done on the IoT device itself.
 
 \subsection{Security} \label{sec:chap3:server:security}
-
+\todo{write this}
 \subsection{Threads \& Concurrency} \label{sec:chap3:server:threads}
+\todo{write this}
 
 
 \section{Device Library \& Example Device} \label{sec:chap3:devicelib}
 Another goal of this project was to create a library that can be used by other programmers, to easily create an IoT device that can connect to this system. This library was written for use with Rust. It is published within the Rust library ecosystem website, found at \textit{crates.io}. The library entry on \textit{crates.io} can be found be \textbf{\href{https://crates.io/crates/NOSHP-Client}{here}}. 
 
 \subsection{Using the Library}
+\todo{some of this code has outdated names, fix that}
 The main purpose of the library to is to abstract details of how the client \& server connection works away from the programmer. While they can still view the source code due to it being open source, they should not need to know the inner workings of the library to be able to use it. The example below, which can be found within the repository for the example device \textbf{\href{https://github.com/niknik3610/Example-Iot-Device}{here}}, demonstrates usage of the library to create a simple IoT device. The purpose of this device is to toggle an LED, attached to a general purpose input output (GPIO) pin, on and off when the appropriate event is received. This code is made to run on a Raspberry Pi and will therefore not run on non Raspberry Pi Devices. It uses a combination of the NOSHP\_Client library (the library created within this paper) and rrpal, a library commonly used to interact with the Raspberry Pi's GPIO in Rust. View the entire code for this simple IoT device and an in depth explanation of it below: 
 
 \pagebreak
@@ -446,7 +448,7 @@ server_ip = "http://192.168.0.0:2302"
     available = true
 \end{lstlisting}
 This configuration is loaded using the "load\_config" method from our library, imported on line 3. 
-\subsubsection{ClientHandler}
+\subsubsection{The Client Handler}
 On line 31, we finally construct the client handler, by calling the "new" method on the "ClientHandler" struct, imported from our library on line 2. Calling the new method initializes the variables inside the ClientHandler, including calling the default method on our State. This might be confusing to someone who is new to Rust, as we never informed the ClientHandler of the ExampleState struct. In this case Rust uses type inference, to infer what struct we are trying to use as our client's state. It infers this information from the callback functions we pass to it using the "add\_callback" method, as they define one of their parameters to be "ExampleState". If we were to remove these calls to "add\_callback", Rust would throw an error at compilation, stating that we need to specify the type of State. The definition of "ClientHandler" looks like this (from \textit{\textbf{client\_library/src/client.rs}}):
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
 pub type Callback<S: State> = fn(&mut S, Request);
@@ -492,7 +494,7 @@ The functions in this case are fairly simple. They use the GPIO pin stored withi
 \subsection{Device Registration} \label{sec:chap3:devicelib:registration}
 While device registration is described in detail within subsection~\ref{sec:chap3:server:registration}, how the library handles registration on the client side will be briefly touched upon within this section.
 
-While the code for client registration section is significantly more simple than that of the server registration, it has again been translated to pseudo code, to be consistent. The real code snippet can be found within \textit{\textbf{client\_library/src/client\_registration.rs}}: 
+While the code for client registration section is significantly more simple than that of the server registration, it has again been translated to pseudo code for consistency. The real code snippet can be found within \textit{\textbf{client\_library/src/client\_registration.rs}}: 
 \begin{lstlisting}[language=Python, style=boxed, showstringspaces=false]{}
 def register_self(
     public_key,
@@ -511,7 +513,7 @@ def register_self(
         response.certificate
     )
 \end{lstlisting}
-The RegistrationServiceClient is the counterpart to the RegistrationServiceServer used by the gRPC server and is imported from the generated code from the RegistrationService protobuf file. We use the client returned by the "connect" method on the RegistrationServiceClient, to call the RPC method "register" (view subsection~\ref{sec:chap3:server:protoBufs}). This then returns the fields required for communication with the server. Finally, we return the ServerConnection struct which is a basic struct from the client library defined as:
+The RegistrationServiceClient is the counterpart to the RegistrationServiceServer used by the gRPC server and is imported from the generated code from the RegistrationService protobuf file. We use the client returned by the "connect" method on the RegistrationServiceClient, to call the RPC function "register" (view subsection~\ref{sec:chap3:server:protoBufs} for more information on how RPC functions are defined). This then returns the fields required for communication with the server. Finally, we return the ServerConnection struct which is a basic struct from the client library defined as:
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
 pub struct ServerConnection {
     pub uuid: String,
@@ -520,10 +522,67 @@ pub struct ServerConnection {
 }
 \end{lstlisting}
 which stores information required for communication with the server. 
-\section{Networking}
+\section{Networking} \label{sec:chap3:networking}
+\todo{write this}
 
 \section{Web \& CLI Frontend} \label{sec:chap3:frontend}
+This section will describe how both the Web and Command Line Interface (CLI) frontends were implemented. It will also discuss specific struggles that were encountered when attempting to create these, and solutions or workarounds to these. 
+\subsection{Command Line Interface Frontend} \label{sec:chap3:cli}
+The first frontend that was implemented was the CLI frontend. It allows a user to control any IoT devices connected to the server from a simple command line enviornment. I was also very useful for testing purposes, as it allowed me to test that the system was working from a simple interface.
+\subsubsection{Running}
+Running the CLI frontend is fairly simple. After compiling the binary from Rust with the compiler in release mode, simply run the binary with the flag "\textit{--server-address}" (shorthand is -s), inputting the gRPC address of the server as the server-address argument. This is made easy as the server outputs the address the gRPC server is running on at startup. For example:
+\begin{lstlisting}[language=Bash, style=boxed, showstringspaces=false]{}
+$ ./frontend -s 192.168.0.1:2302
+\end{lstlisting}
+will run the frontend if the server's IP address is \textit{192.168.0.1:2302}.
+
+\subsubsection{Using the Interface}
+Using the interface is quite simple. At startup the user will be greated with two options:
+\pagebreak
+\begin{lstlisting}[language=, style=boxed, showstringspaces=false]{}
+Connecting...
+Connection Successful
+Welcome to Nik's Smart Home System
+Your Device id is: 9404bec6-6a07-4374-bb34-f31e5809e348
+
+What would you like to do?
+1. Control a device
+2. Quit
+\end{lstlisting}
+If they select \textit{Control a device} (by entering the number 1), the frontend will fetch any devices connected to the server.
+\begin{lstlisting}[language=, style=boxed, showstringspaces=false]{}
+Fetching available devices...
+0: Pi
+1: Quit
+
+What device would you like to control?:
+\end{lstlisting}
+Currently there is only one device connected to the server, with the name "Pi". If we select to control the "Pi", we will be met with the screen:
+
+\begin{lstlisting}[language=, style=boxed, showstringspaces=false]{}
+Heres what you can do:
+0: Turn Off
+1: Turn On
+2: Quit
+\end{lstlisting}
+Under the hood, the frontend is fetching any capabilities defined within the config.toml being used by the device we are attempting to control. For more information how this works viewsection~\ref{sec:chap3:devicelib}. If we select any of the capabilities, we will be met with the text:
+\begin{lstlisting}[language=, style=boxed, showstringspaces=false]{}
+Making request....
+Operation was successful
+\end{lstlisting}
+If the request was unsuccessfully received, then an error message will be printed instead:
+\begin{lstlisting}[language=, style=boxed, showstringspaces=false]{}
+Making request....
+There was an error:
+status: Unavailable, message: "error trying to connect: 
+tcp connect error: Connection refused (os error 111)", 
+details: [], metadata: MetadataMap { headers: {} }
+\end{lstlisting}
+If the request was successful, then the next time the client polls the server, they will receive the event that selected and the callback function attached to that event will be called, in this case turning on or off an LED connected to the device. For more information on this view section~\ref{sec:chap3:devicelib}.
+
+\subsection{Working with Typescript and Vue} \label{sec:chap3:ts}
 \subsection{Using JSON for the Frontend API} \label{sec:chap3:frontend:json}
+
 Write about here:
 - Show Json service in Rust
 - Why its bound on localhost
