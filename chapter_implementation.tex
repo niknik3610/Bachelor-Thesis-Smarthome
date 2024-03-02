@@ -570,7 +570,8 @@ def verify_signature_update_request(
         signature
     )
 \end{lstlisting}
-The current expiration time for a signature (and in extension message) is 10 seconds. This ensures that an attacker cannot use a replay attack to maliciously control the system and if something goes wrong, that outdated packets don't influence behavior.
+The current expiration time for a signature (and in extension message) is 10 seconds. This ensures that an attacker cannot use a replay attack to maliciously control the system and if something goes wrong during packet transfer, that outdated packets don't influence behavior.
+
 \section{Web \& CLI Frontend} \label{sec:chapimpl:frontend}
 This section will describe how both the Web and Command Line Interface (CLI) frontends were implemented. It will also discuss specific struggles that were encountered when attempting to create these, and solutions or workarounds to these. 
 \subsection{Command Line Interface Frontend} \label{sec:chapimpl:cli}
