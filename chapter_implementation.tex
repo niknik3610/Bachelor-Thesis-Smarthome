@@ -105,8 +105,6 @@ Startup of the server is currently quite simple:
 \includegraphics[width=\textwidth]{server_startup}
 \end{figure}
 
-\todo{fix the ot word}
-
 \subsubsection{Command Line Arguments}
 Command line (CLI) arguments are parsed using a Rust library called "Clap". Currently the only commandline argument that can be passed is running the optional HTTP server, which enables using JSON for the frontend (view subsection~\ref{sec:chapimpl:frontend:json}), however there are plans to include other arguments, such as giving an IP address or Port for the gRPC server to run on as an argument. Currently, the computer's IP address is discovered automatically using a crate called "local-ip-address". 
 
@@ -481,8 +479,10 @@ which stores information required for communication with the server.
 \todo{write this}
 
 \section{Security} \label{sec:chapimpl:security}
-As previously discussed, security is an important concern within a smart-home environment
+This section will briefly showcase implementations of the protocols described within subsection~\ref{sec:chapdesign:security}.
+
 \subsection{Certificates} \label{sec:chapimpl:security:certificates}
+
 \subsection{Signatures} \label{sec:chapimpl:security:signatures}
 
 \section{Web \& CLI Frontend} \label{sec:chapimpl:frontend}

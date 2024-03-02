@@ -45,13 +45,16 @@ Most of the choice between different web-frameworks comes down to personal prefe
 
 \section{System Architecture} \label{sec:chapdesign:architecture}
 
+The overall system architecture can be seen in figure~\ref{fig:system_architecture}.
 \begin{figure}[h]
 \caption{System Architecture}
 \includegraphics[width=\textwidth]{system_architecture.png}
 \label{fig:system_architecture}
 \end{figure}
+This system architecture consists of two main components, the server and the client. Here the server represents the main controller of the system. The client is any device connected to the system (there most likely will be multiple). One peculiarity, is the fact that the frontend is contained by the server part of the system. This is because, in the current design, by default the frontend will be run on the same machine as the backend, with frontend API endpoints (located in the frontend services) being open on the localhost loop back address. This can however be easily changed by a user, by simply changing the address the frontend API endpoints are hosted on.
 
-\pagebreak
+The arrows in the architectural diagram represent the direction of contact. For example, a client can contact the backend and the backend may respond, however the backend cannot contact a device, it can only reply to a request. The only deviation from this rule is within the client. At startup, the user will supply the client library with callback functions, which the library can call. This means that the user defined code must be able to contact the client library during setup. However, once the client library has finished setup and has created contact with the backend, the user defined code can no longer interact directly with the client library. The library will then simply call any code supplied to it during setup, without having any direct contact with user defined code.
+
 \section{Security} \label{sec:chapdesign:security}
 As previously discussed, security is an important concern within a smart-home environment. The user of the system is putting trust into the system to behave as it is meant to, while keeping their personal data safe from outside intruders. That is why special care will be put into the security aspects of the system. This will come in a two pronged approach using certificates and signatures. 
 \subsection{Certificates}
