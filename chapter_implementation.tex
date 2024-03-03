@@ -503,9 +503,8 @@ pub fn gen_certificate(&self, csr: &String) -> String {
 //Verifies a certificate 
 pub fn verify_certificate(
     &self,
-    certificate: String,
-    device_pub_key: String,
-    device_uuid: String,
+    certificate_from_device: String,
+    certificate_authentic: String
 ) -> bool {
     let certificate_authentic = 
     Signature::try_from(
@@ -540,10 +539,10 @@ pub fn sign_data(&self, data: String) -> (Vec<u8>, u64) {
 \end{lstlisting}
 As mentioned in the comment on line one, this function takes data in the form of a string, concatenates it with the current time-stamp (in Unix time), then signs it with the same pss key used to sign data in the gen\_certificate function. It then returns the the signature in the form of an Array of bytes, along with the timestamp.
 
-Due to more complexity in the verification function, it will be provided in pseudo code. For the real code, view the file \textit{\textbf{backend/src/server/certificate\_signing.rs}}. 
+Due to more complexity in the verification function, it will be provided in pseudo code. For the original Rust code, view the file \textit{\textbf{backend/src/server/certificate\_signing.rs}}. 
 \begin{lstlisting}[language=Python, style=boxed, showstringspaces=false]{}
 def verify_signature_update_request(
-    self,
+    client_verifying_key,
     certificate,
     updated_capabilities,
     client_timestamp
@@ -565,12 +564,12 @@ def verify_signature_update_request(
         + capability_string
         + certificate
 
-    return self.verification_key.verify(
+    return client_verifying_key.verify(
         to_check_against,
         signature
     )
 \end{lstlisting}
-The current expiration time for a signature (and in extension message) is 10 seconds. This ensures that an attacker cannot use a replay attack to maliciously control the system and if something goes wrong during packet transfer, that outdated packets don't influence behavior.
+The current expiration time for a signature (and in extension message) is 10 seconds. This ensures that an attacker cannot use a replay attack to maliciously control the system and if something goes wrong during packet transfer, that outdated packets don't influence behavior. The client's verifying key, which is used to check the validity of the signature, is derived from the client's public key during registration.
 
 \section{Web \& CLI Frontend} \label{sec:chapimpl:frontend}
 This section will describe how both the Web and Command Line Interface (CLI) frontends were implemented. It will also discuss specific struggles that were encountered when attempting to create these, and solutions or workarounds to these. 
@@ -631,7 +630,6 @@ This section will give a description of how the CLI frontend functions and some 
 
 The CLI frontend is relatively simple when compared to the rest of this system. All logic is contained in the file \textit{\textbf{backend/src/frontend/frontend.rs}}. It uses gRPC to communicate with the server, using the same gRPC server as the devices. In fact, any device could also act as a frontend and vice-versa. The frontend API is defined within \textit{\textbf{protos/frontend}}. For example, the defintion for frontend definition is defined in \textit{\textbf{protos/frontend/registrationService.proto}} and looks like this:
 
-\pagebreak
 \begin{lstlisting}[language=protobuf3, style=boxed, showstringspaces=false]{}
 syntax = "proto3";
 package frontend.registration;
@@ -670,6 +668,20 @@ message Device {
 The frontend gRPC API has two functions, "Register" and "GetConnectedDevices". The Register function is used to register the frontend with the server. The frontend will then assign it an identifier, with which it can make requests. The GetConnectedDevices function is used by the frontend when the user requests connected devices. The server will respond with the device name, it's ID and any capabilities the device has. The server only responds with capabilities that are currently available.
 
 \subsection{Web Frontend} \label{sec:chapimpl:frontend:web}
+The web frontend was built using a combination of Typescript and VueJS. It mainly serves as a proof of concept, minimum viable product web-frontend, as it is expected that most users would build their own frontend for their own needs. It also serves to demonstrate how a user can access and use the frontend API to build a web frontend.
+\subsubsection{Design}
+The final design of the frontend is fairly close to the original design proposed within figure~\ref{fig:home_screen_mockup}. View figure~\ref{fig:home_screen_final} for the final design (note that for readability reasons it has been zoomed in considerably).
+
+\begin{figure}[h]
+\caption{Web-frontend Home Screen Final}
+\includegraphics[width=\textwidth]{homescreen_final.png}
+\label{fig:home_screen_final}
+\end{figure}
+
+The designs look fairly similar, with the only real difference being Github icon in the bottom right corner, that serves as a link to the project's repository. This allows the user easy access to documentation, or the ability to file a bug report in the Issues section of the repository.
+
+\subsubsection{Calling the frontend API from the Web}
+
 \subsection{Using JSON for the Frontend API} \label{sec:chapimpl:frontend:json}
 
 Write about here:
