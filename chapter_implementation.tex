@@ -330,9 +330,8 @@ Another goal of this project was to create a library that can be used by other p
 
 \subsection{Using the Library}
 \todo{some of this code has outdated code fix that}
-The main purpose of the library to is to abstract details of how the client \& server connection works away from the programmer. While they can still view the source code due to it being open source, they should not need to know the inner workings of the library to be able to use it. The example below, which can be found within the repository for the example device \textbf{\href{https://github.com/niknik3610/Example-Iot-Device}{here}}, demonstrates usage of the library to create a simple IoT device. The purpose of this device is to toggle an LED, attached to a general purpose input output (GPIO) pin, on and off when the appropriate event is received. This code is made to run on a Raspberry Pi and will therefore not run on non Raspberry Pi Devices. It uses a combination of the NOSHP\_Client library (the library created within this paper) and rrpal, a library commonly used to interact with the Raspberry Pi's GPIO in Rust. View the entire code for this simple IoT device and an in depth explanation of it below: 
+The main purpose of the library to is to abstract details of how the client \& server connection works away from the programmer. While they can still view the source code due to it being open source, they should not need to know the inner workings of the library to be able to use it. The example below, which can be found within the repository for the example device \textbf{\href{https://github.com/niknik3610/Example-Iot-Device}{here}}, demonstrates usage of the library to create a simple IoT device. The purpose of this device is to toggle an LED, attached to a general purpose input output (GPIO) pin, on and off when the appropriate event is received. This code is made to run on a Raspberry Pi and will therefore not run on non Raspberry Pi Devices. It uses a combination of the NOSHP\_Client library (the library created within this paper) and rrpal, a library commonly used to interact with the Raspberry Pi's GPIO in Rust. View the entire code for this simple IoT device and an in-depth explanation of it below: 
 
-\pagebreak
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
 use NOSHP_Client::{
     client::{ClientHandler, Request, State},
@@ -669,6 +668,10 @@ The frontend gRPC API has two functions, "Register" and "GetConnectedDevices". T
 
 \subsection{Web Frontend} \label{sec:chapimpl:frontend:web}
 The web frontend was built using a combination of Typescript and VueJS. It mainly serves as a proof of concept, minimum viable product web-frontend, as it is expected that most users would build their own frontend for their own needs. It also serves to demonstrate how a user can access and use the frontend API to build a web frontend.
+
+\subsubsection{Running}
+The web frontend can be run from the \textit{\textbf{vue\_frontend}} directory. Using the node packet manager (NPM), using the command: \verb|npm install|. Once all dependencies have been installed, protobuf files must be compiled. This can be done using the bash script \textit{\textbf{vue\_frontend/build\_proto.sh}}. From there the site can be hosted using: \verb|npm run dev|, and can be accessed at \mbox{localhost:5173}.
+
 \subsubsection{Design}
 The final design of the frontend is fairly close to the original design proposed within figure~\ref{fig:home_screen_mockup}. View figure~\ref{fig:home_screen_final} for the final design (note that for readability reasons it has been zoomed in considerably).
 
@@ -681,6 +684,45 @@ The final design of the frontend is fairly close to the original design proposed
 The designs look fairly similar, with the only real difference being Github icon in the bottom right corner, that serves as a link to the project's repository. This allows the user easy access to documentation, or the ability to file a bug report in the Issues section of the repository.
 
 \subsubsection{Calling the frontend API from the Web}
+There are two ways to call the frontend API, one through JSON using an HTTP server, the second through gRPC. For the reasoning behind this view subsection~\ref{sec:chapimpl:frontend:json}. The web-frontend uses the JSON API to make calls to frontend API endpoints. All this means for a user of the system, is that they will need to start the server with the \textit{"-{}-json-frontend} flag, to enable the HTTP server that allows for JSON calls.
+
+Once the HTTP server has been enabled, calling the frontend API is fairly easy. The vue\_frontend (which houses all web frontend files) contains a simple script which can used to generate JS files and with Typescript type definitions from the protobuf definitions.The script uses a Javascript library called ProtobufJs, to generate these files. Once these files are available, all types used in the CLI frontend are now also available, making calling the frontend API very easy. Below is a typescript code snippet from \textit{\textbf{vue\_frontend/src/backend\_calls/registration.ts}}:
+
+\begin{lstlisting}[language=ES6, style=boxed, showstringspaces=false]{}
+import { API_REGISTRATION_ADDRESS } from "@/api_call_links";
+import { Result, errAsync, okAsync } from "neverthrow";
+import { frontend } from "@/generated/generated";
+
+export async function registerSelf(deviceName: string)
+: Promise<
+    Result<frontend.registration.RegistrationResponse, Error>
+> {
+    const req = 
+        new frontend.registration.RegistrationRequest({
+            device_name: deviceName,
+        });
+
+    const res = await fetch(API_REGISTRATION_ADDRESS, {
+        method: "POST",
+        body: JSON.stringify(req),
+        headers: {
+            "Content-type": 
+                "application/json; charset=UTF-8",
+        },
+    });
+
+    try {
+        const parsed: 
+            frontend.registration.RegistrationResponse =
+                await JSON.parse(await res.text());
+        return okAsync(parsed);
+    } catch (e) {
+        return errAsync(new Error("Malformed Api Response"));
+    }
+}
+\end{lstlisting}
+
+In this typescript snippet we construct a new "RegistrationRequest", send it in the JSON format to the server. We then await a response and parse it into a "RegistrationResponse" and return that. The address used for this is defined in the \textit{\textbf{api\_call\_links.ts}} file. In this case being "/api/frontend/registration", with the fetch request being made to the domain the server is on (in this case http://localhost:5173). due to the "/api" prefix in the address, the request is automatically forwarded to the HTTP server. Without the "/api" prefix, the site at "/frontend/registration" would be requested instead, returning a 404 Not Found error, instead of an API response. All of this is handled by the Vite web server, which is hosting the website.
 
 \subsection{Using JSON for the Frontend API} \label{sec:chapimpl:frontend:json}
 
