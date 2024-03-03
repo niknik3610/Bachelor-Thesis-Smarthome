@@ -725,8 +725,46 @@ export async function registerSelf(deviceName: string)
 In this typescript snippet we construct a new "RegistrationRequest", send it in the JSON format to the server. We then await a response and parse it into a "RegistrationResponse" and return that. The address used for this is defined in the \textit{\textbf{api\_call\_links.ts}} file. In this case being "/api/frontend/registration", with the fetch request being made to the domain the server is on (in this case http://localhost:5173). due to the "/api" prefix in the address, the request is automatically forwarded to the HTTP server. Without the "/api" prefix, the site at "/frontend/registration" would be requested instead, returning a 404 Not Found error, instead of an API response. All of this is handled by the Vite web server, which is hosting the website.
 
 \subsection{Using JSON for the Frontend API} \label{sec:chapimpl:frontend:json}
+Throughout this report a JSON frontend API has been alluded to, this subsection will explain why it was necessary to implement this in the first place. GRPC uses the HTTP/2 protocol to communicate, which is supported by web browsers. However, some features in HTTP/2 required by gRPC are not exposed by web browser \cite{grpcWeb} for a variety of reasons, which lead to the creation of gRPC web. GRPC web functions slightly differently to normal gRPC and is not compatible with normal gRPC, due to the HTTP/2 issues. Because of this, a proxy between the normal gRPC server and gRPC web needs to be used to communicate.
 
-Write about here:
-- Show Json service in Rust
-- Why its bound on localhost
-- Why protobuf compiler needs Serialize and Deserialize on these structs
+Instead of using a seperate program as a proxy, I decided to use a JSON to GRPC translation proxy instead, running on the server. This makes it possible to use a web-based frontend, without having the additional restrictions imposed by gRPC web. The downside of this, is that another HTTP server needs to be spawned, if the user decides to use JSON. Additionally, all benefits of using GRPC with the frontend are lost, as JSON is sent anyway. That being said, there are some benefits.
+
+The JSON proxy I have created is completely transparent to the server, as the proxy calls gRPC functions. Additionally, the protobuf files are still used in combination with typescript. This means that nothing in the packets is changed between the proxy and the server, the packet is simply parsed and forwarded as a gRPC packet. Another positive side effect of the JSON proxy, is that most frontend developers are significantly more familiar with working with JSON than gRPC, making it easier to create a custom frontend for the system. No extra program needs to be installed, or started when using a web-based frontend, one simply needs to include a flag when starting the server and the rest is handled automatically. Finally, if a user wants to create a web frontend using gRPC web, this can easily be done, with no changes required to the server code.
+
+View an example below of how JSON calls to the server are translated to gRPC function calls (from the file \textit{\textbf{backend/src/server/web\_json\_translation/json\_registration.rs}}): 
+\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
+#[actix_web::post("/frontend/registration")]
+pub async fn json_registration(
+    req_body: String,
+    state: actix_web::web::Data<TranslationClientState>,
+) -> impl Responder {
+    let parsed_req: 
+        json_registration_service::RegistrationRequest =
+            match serde_json::from_str(&req_body) {
+                Ok(r) => r,
+                Err(_e) => return 
+                    HttpResponse::BadRequest()
+                        .body("Unable to parse request"),
+            };
+
+    let response = {
+        let mut registration_service_client 
+            = state.registration_client.lock().await;
+
+        registration_service_client
+            .register(parsed_req).await
+    };
+
+    let response = match response {
+        Ok(r) => r.into_inner(),
+        Err(e) => return HttpResponse::InternalServerError()
+            .body(e.to_string()),
+    };
+
+    return HttpResponse::Ok()
+        .body(serde_json::to_string(&response).unwrap());
+}
+\end{lstlisting}
+While this code looks complicated (partially due to formatting restrictions), it is actually quite simple. We parse the JSON request into a RegistrationRequest struct. If fails we send an error to the sender. We then forward the request to our "registration\_service\_client", which is a gRPC client registered as a frontend with the server. This is contained in a Mutex, due to the fact that it may be accessed concurrently, so we need to wait for it's lock to be available first. Finally, we check that the response is not an error. If it is not, we turn the response to a string and forward it to the sender, otherwise we forward the error message.
+
+In subsection~\ref{sec:chapdesign:server:protoBufs} it was mentioned that the protobuf compiler needed to implement the interfaces Serialize and Deserialize on the protobuf files in the frontend folder. The reason for this can be seen in the code snippet above. Requests that are in the form of JSON need to be turned into their corresponding Rust structs. This is done using the "serde\_json" library. If the "Serialize" and "Deserialize" traits are not implemented on structs from the protobuf file, then JSON requests will not be parsed. In fact, due to Rust's type system, the program will not even compile.
