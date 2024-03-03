@@ -1,8 +1,6 @@
 \chapter{Implementation} \label{cha:implementation}
 
-\todo{split chapter section into design \& implementation}
-
-\section{Server \& Hub} \label{sec:chapimpl:server}
+\section{Backend Server \& Device Management} \label{sec:chapimpl:server}
 Due to the server being the largest part of this project, and practically being a requirement for testing the client and frontend functionality, this will be focused on first. This section will describe defining and compiling protobuf files for API endpoints, server startup, how IOT devices are registered, security mechanisms and how concurrency was handled within the server. 
 
 \subsection{Protocol Buffers and Tonic} \label{sec:chapdesign:server:protoBufs}
@@ -186,7 +184,7 @@ let result = actix_web::HttpServer::new(move || {
 \end{lstlisting}
 \textit{Note that the above code snippet is abbreviated for readability, it is however still valid Rust code and gives a good representation of what is done in server.rs.} 
 
-Due to this builder function requiring more Rust specific knowledge to understand, it will be simplified here. It is functionally the same as the one seen from Tonic. First we create a new HTTPServer struct from the actix\_web module. We then hand it our services using the "service" method. What is different here, is that we are actually handing it callback functions, instead of structs with traits implemented. To view an example of these services, view subsection~\ref{sec:chapimpl:server:registration}. From there we bind this server to the constant string JSON\_ADDRESS. This is an IP Address defined at compile time, the definition however is found above the web server. The server is running on localhost, as it is meant for communication with the web frontend. We then call the run method and await the result. In reality the server is being awaited on a different thread than the gRPC server, so the two can run concurrently, this is not shown in the above code snippet. 
+Due to this builder function requiring more Rust specific knowledge to understand, it will be simplified here. It is functionally the same as the one seen from Tonic. First we create a new HTTPServer struct from the actix\_web module. We then hand it our services using the "service" method. What is different here, is that we are actually handing it callback functions, instead of structs with traits implemented. To view an example of these services, view subsection~\ref{sec:chapimpl:server:registration}. From there we bind this server to the constant string JSON\_ADDRESS. This is an IP Address defined at compile time, the definition however is found above the web server. The server is running on localhost, as it is meant for communication with the web frontend. We then call the run method and await the result. In reality the server is being awaited on a different thread than the gRPC server, so the two can run concurrently. This is not shown in the above code snippet. 
 
 For code beyond the above provided abbreviated snippets view the file \textbf{\textit{backend/src/server/server.rs}}, which contains the main function for the server.
 
@@ -475,102 +473,6 @@ pub struct ServerConnection {
 }
 \end{lstlisting}
 which stores information required for communication with the server. 
-\section{Networking} \label{sec:chapimpl:networking}
-\todo{write this}
-
-\section{Security} \label{sec:chapimpl:security}
-This section will briefly showcase implementations of the protocols described within subsection~\ref{sec:chapdesign:security}. The code snippet is from the file \textit{\textbf{backend/src/server/certificate\_signing.rs}} 
-
-\subsection{Certificates} \label{sec:chapimpl:security:certificates}
-\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
-use rsa::{
-    pss::{BlindedSigningKey, Signature, VerifyingKey},
-    sha2::Sha256,
-    signature::{
-        Keypair, RandomizedSigner, 
-        SignatureEncoding, Verifier
-    },
-    RsaPrivateKey,
-};
-//CSR = (device_id + device_public_key)
-pub fn gen_certificate(&self, csr: &String) -> String {
-    let mut rng = rand::thread_rng();
-    let certificate = self
-        .signing_key
-        .sign_with_rng(&mut rng, csr.as_bytes())
-        .to_string();
-    certificate
-}
-//Verifies a certificate 
-pub fn verify_certificate(
-    &self,
-    certificate_from_device: String,
-    certificate_authentic: String
-) -> bool {
-    let certificate_authentic = 
-    Signature::try_from(
-        &*certificate_authentic.as_bytes()
-    ).unwrap();
-
-    match self.verification_key.verify(
-        &certificate_from_device.as_bytes(),
-        &certificate_authentic
-    ) {
-        Ok(_) => true,
-        Err(_) => false,
-    }
-}
-\end{lstlisting}
-In the gen\_certificate function, we are using the RSA Rust library, specifically the Probabilistic Signature Scheme (pss) module, to generate a digest of csr. PSS is an encoding method for digital signatures, meant to be a replacement for the popular PKCS#1. Within the verify certificate function we simply compare the signature we know is authentic (stored when it is sent to the device), to that provided by the device. If they are the same, then we know the device is authentic. 
-
-\subsection{Signatures} \label{sec:chapimpl:security:signatures}
-Signatures are similarly simple. To generate a signature for a message being sent we use the sign\_data function (from \textit{\textbf{backend/src/server/certificate\_signing.rs}}):
-\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
-///returns the signature and timestamp of the signature
-pub fn sign_data(&self, data: String) -> (Vec<u8>, u64) {
-    let timestamp = get_timestamp();
-    let data = timestamp.to_string() + &data;
-
-    let mut rng = rand::thread_rng();
-    let signed = self.signing_key.sign_with_rng(
-        &mut rng, data.as_bytes()
-    );
-    (signed.to_vec(), timestamp)
-}
-\end{lstlisting}
-As mentioned in the comment on line one, this function takes data in the form of a string, concatenates it with the current time-stamp (in Unix time), then signs it with the same pss key used to sign data in the gen\_certificate function. It then returns the the signature in the form of an Array of bytes, along with the timestamp.
-
-Due to more complexity in the verification function, it will be provided in pseudo code. For the original Rust code, view the file \textit{\textbf{backend/src/server/certificate\_signing.rs}}. 
-\begin{lstlisting}[language=Python, style=boxed, showstringspaces=false]{}
-def verify_signature_update_request(
-    client_verifying_key,
-    certificate,
-    updated_capabilities,
-    client_timestamp
-    signature
-):
-    server_timestamp = get_timestamp()
-    if (
-        server_timestamp - client_timestamp 
-        > SIGNATURE_EXPIRATION_SECONDS
-    ):
-        return false
-
-    capability_string = updated_capabilities.reduce(
-        (acc, capability) => {
-            acc + capability.to_string()
-        }
-    )
-    to_check_against = client_timestamp 
-        + capability_string
-        + certificate
-
-    return client_verifying_key.verify(
-        to_check_against,
-        signature
-    )
-\end{lstlisting}
-The current expiration time for a signature (and in extension message) is 10 seconds. This ensures that an attacker cannot use a replay attack to maliciously control the system and if something goes wrong during packet transfer, that outdated packets don't influence behavior. The client's verifying key, which is used to check the validity of the signature, is derived from the client's public key during registration.
 
 \section{Web \& CLI Frontend} \label{sec:chapimpl:frontend}
 This section will describe how both the Web and Command Line Interface (CLI) frontends were implemented. It will also discuss specific struggles that were encountered when attempting to create these, and solutions or workarounds to these. 
@@ -731,7 +633,7 @@ Throughout this report a JSON frontend API has been alluded to, this subsection 
 
 Instead of using a seperate program as a proxy, I decided to use a JSON to GRPC translation proxy instead, running on the server. This makes it possible to use a web-based frontend, without having the additional restrictions imposed by gRPC web. The downside of this, is that another HTTP server needs to be spawned, if the user decides to use JSON. Additionally, all benefits of using GRPC with the frontend are lost, as JSON is sent anyway. That being said, there are some benefits.
 
-The JSON proxy I have created is completely transparent to the server, as the proxy calls gRPC functions. Additionally, the protobuf files are still used in combination with typescript. This means that nothing in the packets is changed between the proxy and the server, the packet is simply parsed and forwarded as a gRPC packet. Another positive side effect of the JSON proxy, is that most frontend developers are significantly more familiar with working with JSON than gRPC, making it easier to create a custom frontend for the system. No extra program needs to be installed, or started when using a web-based frontend, one simply needs to include a flag when starting the server and the rest is handled automatically. Finally, if a user wants to create a web frontend using gRPC web, this can easily be done, with no changes required to the server code.
+The JSON proxy I have created is completely transparent to the server, as the proxy calls gRPC functions. Additionally, the protobuf files are still used in combination with Typescript. This means that nothing in the packets is changed between the proxy and the server, the packet is simply parsed and forwarded as a gRPC packet. Another positive side effect of the JSON proxy, is that most frontend developers are significantly more familiar with working with JSON than gRPC, making it easier to create a custom frontend for the system. No extra program needs to be installed, or started when using a web-based frontend, one simply needs to include a flag when starting the server and the rest is handled automatically. Finally, if a user wants to create a web frontend using gRPC web, this can easily be done, with no changes required to the server code.
 
 View an example below of how JSON calls to the server are translated to gRPC function calls (from the file \textit{\textbf{backend/src/server/web\_json\_translation/json\_registration.rs}}): 
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
@@ -770,3 +672,101 @@ pub async fn json_registration(
 While this code looks complicated (partially due to formatting restrictions), it is actually quite simple. We parse the JSON request into a RegistrationRequest struct. If fails we send an error to the sender. We then forward the request to our "registration\_service\_client", which is a gRPC client registered as a frontend with the server. This is contained in a Mutex, due to the fact that it may be accessed concurrently, so we need to wait for it's lock to be available first. Finally, we check that the response is not an error. If it is not, we turn the response to a string and forward it to the sender, otherwise we forward the error message.
 
 In subsection~\ref{sec:chapdesign:server:protoBufs} it was mentioned that the protobuf compiler needed to implement the interfaces Serialize and Deserialize on the protobuf files in the frontend folder. The reason for this can be seen in the code snippet above. Requests that are in the form of JSON need to be turned into their corresponding Rust structs. This is done using the "serde\_json" library. If the "Serialize" and "Deserialize" traits are not implemented on structs from the protobuf file, then JSON requests will not be parsed. In fact, due to Rust's type system, the program will not even compile.
+
+\section{Security} \label{sec:chapimpl:security}
+This section will briefly showcase implementations of the protocols described within subsection~\ref{sec:chapdesign:security}. The code snippet is from the file \textit{\textbf{backend/src/server/certificate\_signing.rs}} 
+
+\subsection{Certificates} \label{sec:chapimpl:security:certificates}
+\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
+use rsa::{
+    pss::{BlindedSigningKey, Signature, VerifyingKey},
+    sha2::Sha256,
+    signature::{
+        Keypair, RandomizedSigner, 
+        SignatureEncoding, Verifier
+    },
+    RsaPrivateKey,
+};
+//CSR = (device_id + device_public_key)
+pub fn gen_certificate(&self, csr: &String) -> String {
+    let mut rng = rand::thread_rng();
+    let certificate = self
+        .signing_key
+        .sign_with_rng(&mut rng, csr.as_bytes())
+        .to_string();
+    certificate
+}
+//Verifies a certificate 
+pub fn verify_certificate(
+    &self,
+    certificate_from_device: String,
+    certificate_authentic: String
+) -> bool {
+    let certificate_authentic = 
+    Signature::try_from(
+        &*certificate_authentic.as_bytes()
+    ).unwrap();
+
+    match self.verification_key.verify(
+        &certificate_from_device.as_bytes(),
+        &certificate_authentic
+    ) {
+        Ok(_) => true,
+        Err(_) => false,
+    }
+}
+\end{lstlisting}
+In the gen\_certificate function, we are using the RSA Rust library, specifically the Probabilistic Signature Scheme (pss) module, to generate a digest of csr. PSS is an encoding method for digital signatures, meant to be a replacement for the popular PKCS#1. Within the verify certificate function we simply compare the signature we know is authentic (stored when it is sent to the device), to that provided by the device. If they are the same, then we know the device is authentic. 
+
+\subsection{Signatures} \label{sec:chapimpl:security:signatures}
+Signatures are similarly simple. To generate a signature for a message being sent we use the sign\_data function (from \textit{\textbf{backend/src/server/certificate\_signing.rs}}):
+\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
+///returns the signature and timestamp of the signature
+pub fn sign_data(&self, data: String) -> (Vec<u8>, u64) {
+    let timestamp = get_timestamp();
+    let data = timestamp.to_string() + &data;
+
+    let mut rng = rand::thread_rng();
+    let signed = self.signing_key.sign_with_rng(
+        &mut rng, data.as_bytes()
+    );
+    (signed.to_vec(), timestamp)
+}
+\end{lstlisting}
+As mentioned in the comment on line one, this function takes data in the form of a string, concatenates it with the current time-stamp (in Unix time), then signs it with the same pss key used to sign data in the gen\_certificate function. It then returns the the signature in the form of an Array of bytes, along with the timestamp.
+
+Due to more complexity in the verification function, it will be provided in pseudo code. For the original Rust code, view the file \textit{\textbf{backend/src/server/certificate\_signing.rs}}. 
+\begin{lstlisting}[language=Python, style=boxed, showstringspaces=false]{}
+def verify_signature_update_request(
+    client_verifying_key,
+    certificate,
+    updated_capabilities,
+    client_timestamp
+    signature
+):
+    server_timestamp = get_timestamp()
+    if (
+        server_timestamp - client_timestamp 
+        > SIGNATURE_EXPIRATION_SECONDS
+    ):
+        return false
+
+    capability_string = updated_capabilities.reduce(
+        (acc, capability) => {
+            acc + capability.to_string()
+        }
+    )
+    to_check_against = client_timestamp 
+        + capability_string
+        + certificate
+
+    return client_verifying_key.verify(
+        to_check_against,
+        signature
+    )
+\end{lstlisting}
+The current expiration time for a signature (and in extension message) is 10 seconds. This ensures that an attacker cannot use a replay attack to maliciously control the system and if something goes wrong during packet transfer, that outdated packets don't influence behavior. The client's verifying key, which is used to check the validity of the signature, is derived from the client's public key during registration.
+
+\section{Networking} \label{sec:chapimpl:networking}
+\todo{write this}
+
