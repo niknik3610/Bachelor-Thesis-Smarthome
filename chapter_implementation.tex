@@ -7,7 +7,7 @@ Due to the server being the largest part of this project, and practically being 
 
 \subsection{Protocol Buffers and Tonic} \label{sec:chapdesign:server:protoBufs}
 \todo{I think this section is probably fine, just talk some more about what these protobufs and method stubs will be used for}
-Protobufs are defined within ".proto" files. They use a fairly basic syntax, where the user can define a service using the "service" keyword. A service can contain many functions which a client can call, these are defined using the "rpc" keyword. You can also define the arguments this function takes and what it returns. Structs are defined using the "message" keyword, where each field is separated by a semicolon. Fields can have multiple modifiers, including optional, repeated and map. Repeated marks a field as possibly being a list, or array structure. Map marks a field as being a map data structure. Finally, messages from other files can be imported, using the import keyword and then giving the file-name. \cite{protobufDocs} For an example of a protobuf file view \textbf{\textit{protos/iot/registrationService.proto}}:
+Protobufs are defined within ".proto" files. They use a fairly basic syntax, where the user can define a service using the "service" keyword. A service can contain many functions which a client can call, these are defined using the "rpc" keyword. You can also define the arguments this function takes and what it returns. Structs are defined using the "message" keyword, where each field is separated by a semicolon. Fields can have multiple modifiers, including optional, repeated and map. Repeated marks a field as possibly being a list, or array structure. Map marks a field as being a map data structure. Finally, messages from other files can be imported, using the import keyword and then giving the file-name \cite{protobufDocs}. For an example of a protobuf file view \textbf{\textit{protos/iot/registrationService.proto}}:
 
 \begin{lstlisting}[language=protobuf3, style=boxed]{iot/registrationService.proto}
 syntax = "proto3";
@@ -23,7 +23,8 @@ service RegistrationService {
 message RegistrationRequest {
     string public_key = 1;
     string name = 2;
-    repeated iot.types.DeviceCapabilityStatus capabilities = 3;
+    repeated iot.types.DeviceCapabilityStatus 
+        capabilities = 3;
 }
 
 message RegistrationResponse {
@@ -182,8 +183,6 @@ let result = actix_web::HttpServer::new(move || {
 .bind(JSON_ADDRESS)?
 .run()
 .await;
-
-println!("Successfully Started JSON API Layer on {JSON_ADDRESS}");
 \end{lstlisting}
 \textit{Note that the above code snippet is abbreviated for readability, it is however still valid Rust code and gives a good representation of what is done in server.rs.} 
 
@@ -207,7 +206,8 @@ When a device wants to connect to the server, it uses the "Register" function fr
 message RegistrationRequest {
     string public_key = 1;
     string name = 2;
-    repeated iot.types.DeviceCapabilityStatus capabilities = 3;
+    repeated iot.types.DeviceCapabilityStatus 
+        capabilities = 3;
 }
 
 //from proto/iot/types.proto
@@ -455,8 +455,9 @@ def register_self(
     server_ip
 ):
     client = RegistrationServiceClient::connect(server_ip)
-    registration_request = 
-        new RegistrationRequest(name, public_key, capabilities)
+    registration_request = new RegistrationRequest(
+        name, public_key, capabilities
+    )
 
     response = client.register(registration_request)
     return new ServerConnection(
@@ -486,11 +487,12 @@ use rsa::{
     pss::{BlindedSigningKey, Signature, VerifyingKey},
     sha2::Sha256,
     signature::{
-        Keypair, RandomizedSigner, SignatureEncoding, Verifier
+        Keypair, RandomizedSigner, 
+        SignatureEncoding, Verifier
     },
     RsaPrivateKey,
 };
-//Generates a certificate from a csr (device_id + device_public_key)
+//CSR = (device_id + device_public_key)
 pub fn gen_certificate(&self, csr: &String) -> String {
     let mut rng = rand::thread_rng();
     let certificate = self
