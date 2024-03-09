@@ -36,9 +36,40 @@ The final test for this subsection is to attempt to trigger the two listed capab
 \label{fig:triggering_capability}
 \end{figure}
 
-You can view the complete code for the client used in this example in the appendix. Due to the simplicity of setting up a client using the NOSHP-Client library, its only 47 lines long.
+You can view the complete code for the client used in this example in the appendix in appendix section~\ref{chap:A2:onedeviceclientlib}. Due to the simplicity of setting up a client using the NOSHP-Client library, its only 47 lines long.
 
-\subsection{Running with One connected Device over Wifi} 
-\subsection{Running with multiple connected devices}
+\subsection{Controlling multiple connected devices}
+This section will be a continuation of the last section, except that multiple devices will now be run, instead of just one. One device will still be run off the Raspberry Pi, the other devices will be run locally, on the server. They will however still be connecting to the public IP Address, not the loop-back address. Running them on the same device as the server has potential performance implications, however it is not relevant to this section, as we are simply attempting to test the functionality of the system.
+
+\subsubsection{Testing}
+One slight modification has been made to the code in appendix section~\ref{chap:A2:onedeviceclientlib}, a print statement has been added to the main function, which prints the device name to standard output. This aids in clarity for which device is which in the screenshots. Additionally, configurations have slightly changed, with each device having uniquely named capabilities and device names, to demonstrate the frontend's ability to show different devices. The IP address they are connecting to will stay the same (the server's IP printed at startup).
+
+\begin{figure}[h]
+\caption{Establishing Connection with four devices}
+\includegraphics[width=\textwidth]{testing_four_devices_connection.png}
+\label{fig:four_connected_device_connection}
+\end{figure}
+As seen in figure~\ref{fig:four_connected_device_connection}, connecting four devices the server is no problem. All four connect, receive their certificate and print that they have successfully established their connection. The next test is to see that all are displayed properly on the frontend, with the correct device names and capability names.
+
+
+\begin{figure}[h]
+\caption{Web-frontend with four devices}
+\includegraphics[width=\textwidth]{testing_four_devices_frontend.png}
+\label{fig:four_connected_device_frontend}
+\end{figure}
+Figure~\ref{fig:four_connected_device_frontend} shows all four devices, with their correct names and capabilities displayed on the web frontend. Note that nothing has been changed about the frontend during this time, this has all been dynamically changed due to changing connected devices. Finally, we must test controlling each of the four devices. This was done by clicking every button seen on screen, from left to right and top to bottom order. The results from this can be seen in figure~\ref{fig:four_connected_device_toggle}.
+
+\begin{figure}[h]
+\caption{Triggering capabilities with four devices}
+\includegraphics[width=\textwidth]{testing_four_devices_toggle.png}
+\label{fig:four_connected_device_toggle}
+\end{figure}
+All four devices trigger their capabilities correctly. That being said, a potential issue was uncovered during this experiment. Due to latency between server and device (specifically the Raspberry Pi which was connected through Wi-Fi), packet signatures can expire before they reach the device. This can lead to lost information, as the server has already removed the update. While a somewhat rare problem, it could happen frequently on a faulty connection. An easy fix was to increase the amount of time it takes for a signature to expire, however a proper fix would for the client to send a response message, when the update has been received. The server would only delete updates when this message is received. 
+
+
+
+
 \subsection{Sending incorrect signatures}
 \section{Performance Testing}
+\section{Issues found during testing}
+- Currently if signature expires, then information is lost as it already has been deleted from the server.
