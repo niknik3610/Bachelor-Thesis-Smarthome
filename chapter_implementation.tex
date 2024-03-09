@@ -716,7 +716,7 @@ pub fn verify_certificate(
     }
 }
 \end{lstlisting}
-In the gen\_certificate function, we are using the RSA Rust library, specifically the Probabilistic Signature Scheme (pss) module, to generate a digest of csr. PSS is an encoding method for digital signatures, meant to be a replacement for the popular PKCS#1. Within the verify certificate function we simply compare the signature we know is authentic (stored when it is sent to the device), to that provided by the device. If they are the same, then we know the device is authentic. 
+In the gen\_certificate function, we are using the RSA Rust library, specifically the Probabilistic Signature Scheme (pss) module, to generate a digest of csr. PSS is an encoding method for digital signatures, meant to be a replacement for the popular PKCS\#1. Within the verify certificate function we simply compare the signature we know is authentic (stored when it is sent to the device), to that provided by the device. If they are the same, then we know the device is authentic. 
 
 \subsection{Signatures} \label{sec:chapimpl:security:signatures}
 Signatures are similarly simple. To generate a signature for a message being sent we use the sign\_data function (from \textit{\textbf{backend/src/server/certificate\_signing.rs}}):
