@@ -3,7 +3,7 @@
 To test Aims and Objectives 1 \& 2, \todo{finish this section}
 
 for All tests in this section a Raspberry Pi 4b was used to host client code, running Raspberry Pi OS Lite (with no desktop environment), which was released on December 11th 2023. The server and frontend were hosted on a Laptop with an Intel i5-12450H processor, running Fedora 39 Linux. The Raspberry Pi's hostname (visible in screenshots) is "nikpi".
-\subsection{Controlling one connected device} 
+\subsection{Controlling one connected device} \label{cha:testing:onedevice}
 Perhaps the most obvious and basic test is to create a device, using the Rust client library, have it run on a device and to connect with that device to a running server. 
 
 \subsubsection{Testing Setup}
@@ -22,16 +22,21 @@ Figure~\ref{fig:establish_connection_raspi} shows the successful connection and 
 \label{fig:establish_connection_raspi}
 \end{figure}
 
-The next important test is viewing the web frontend, to see that the device is correctly displayed on the frontend, with the appropriate capabilities. This can be seen in figure~\ref{fig:web_frontend_one_connected_device}, where the device, named "Hello device" (view configuration file) can be seen with it's two capabilities "Turn Off" and "Turn On". The web-frontend is being hosted by a Vite server, through using the command "npm run dev", on localhost port 5173. The frontend is being displayed by the Chromium web browser.
+The next important test is viewing the web frontend, to see that the device is correctly displayed on the frontend, with the appropriate capabilities. This can be seen in figure~\ref{fig:web_frontend_one_connected_device}, where the device, named "Hello device" (view configuration file) can be seen with it's two capabilities "Turn Off" and "Turn On". The web-frontend is being hosted by a Vite server, through using the command "npm run dev", on localhost port 5173. The frontend is being rendered by the Chromium web browser.
 \begin{figure}[h]
 \caption{Web Frontend with the connected device}
 \includegraphics[width=\textwidth]{testing_web_frontend_one_device}
 \label{fig:web_frontend_one_connected_device}
 \end{figure}
 
+The final test for this subsection is to attempt to trigger the two listed capabilities, by clicking the buttons. This should send a JSON packet to the JSON proxy server, which is then forwarded to the gRPC server. Once this request has been processed, the server will add it to the list of updates for the specified client. The client will then eventually poll the server and receive the update. It will then call the callback function associated with that capability. For this specific test both buttons will be clicked, starting with the "Turn Off" button, then the "Turn On Button". As shown in figure~\ref{fig:triggering_capability} this works as expected and the associated callback functions are called.
+\begin{figure}[h]
+\caption{Triggering capabilities}
+\includegraphics[width=\textwidth]{toggle_turn_on_off}
+\label{fig:triggering_capability}
+\end{figure}
 
-
-
+You can view the complete code for the client used in this example in the appendix. Due to the simplicity of setting up a client using the NOSHP-Client library, its only 47 lines long.
 
 \subsection{Running with One connected Device over Wifi} 
 \subsection{Running with multiple connected devices}
