@@ -66,10 +66,102 @@ Figure~\ref{fig:four_connected_device_frontend} shows all four devices, with the
 \end{figure}
 All four devices trigger their capabilities correctly. That being said, a potential issue was uncovered during this experiment. Due to latency between server and device (specifically the Raspberry Pi which was connected through Wi-Fi), packet signatures can expire before they reach the device. This can lead to lost information, as the server has already removed the update. While a somewhat rare problem, it could happen frequently on a faulty connection. An easy fix was to increase the amount of time it takes for a signature to expire, however a proper fix would for the client to send a response message, when the update has been received. The server would only delete updates when this message is received. 
 
-
-
-
-\subsection{Sending incorrect signatures}
 \section{Performance Testing}
+The main metric that was interesting for performance testing was the amount of clients the server can handle, connected at once. A secondary objective was testing the performance of the client.
+
+\subsubsection{Additional Programs}
+Gnome's "System Monitor" was used during the testing process to monitor resource usage of the server. Window's "Task Manager" was used to view the client's resource usage.
+
+Two simple programs were constructed for this testing process. The first is a mock frontend. This frontend's Job is to act as a sort of distributed denial of service attack (DDOS) on the server, attempting to generate as many requests in a short amount of time as possible. To do this, it requests all connected devices and their capabilities. It then iterates through every connected device and sends a request to trigger all available capabilities. It repeats this process multiple times, with the amount being determined by an argument passed to the program, which is called "count". If the server has 10 clients connected to it, with two capabilities each, with the DDOS' count variable being set to 100, then \(requestAmount = 10 * 2 * 100 = 2000\). All these requests are sent as fast as the server will accept them. Each request also carries a timestamp with it, of when it was sent. This can then be measured against when the server forwards the request, to find the time it took for the server to receive, process and forward the request. These requests are sent through gRPC, so there is no added delay from the JSON http-proxy to take into account. View the code for this DDOS attack below (from \textit{\textbf{testing/ddos\_noshp\_server/src/main.rs}}):
+\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
+    println!("Starting DDOS Attack");
+    for _ in 0..args.count {
+        println!("finished iteration");
+        let devices = 
+            get_connected_devices(
+                &device_id, 
+                &mut registration_client
+            )
+            .await
+            .unwrap();
+
+        for device in devices.iter() {
+            for capability in device.capabilities.iter() {
+                if capability.available {
+                    control_client.control_device(
+                    DeviceControlRequest {
+                        capability: capability
+                            .capability.clone(),
+                        device_uuid: device
+                            .device_uuid.clone(),
+                        timestamp: get_timestamp(),
+                    }).await.unwrap();
+                }
+            }
+        }
+    }
+    return Ok(());
+\end{lstlisting}
+
+The second program written for these tests is a simple client implementation, that uses the NOSHP\_client library to spawn clients, each running on its own thread. It will spawn the amount of clients specified through a command line argument, stored in the "count" variable. View the code for this second program below (from \textit{\textbf{testing/spawn\_noshp\_clients/src/main.rs}}):
+\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
+for i in 0..args.count {
+    let mut config = config.clone();
+    config.device_name += &i.to_string();
+    let handle = tokio::spawn(async move {
+        let client_handler = NoshpClient::new()
+            .add_callback("Turn On", 
+                Box::new(turn_on_led))
+            .add_callback("Turn Off", 
+                Box::new(turn_off_led))
+            .run(config)
+            .await
+            .unwrap();
+    });
+    thread_handles.push(handle);
+}
+
+for handle in thread_handles {
+    handle.await.unwrap();
+}
+\end{lstlisting}
+
+\subsubsection{Testing Methodology}
+The clients and server were separated between two computers. This decision was made to ensure fair results. The server was run on a laptop, with an Intel i5-12450H processor, 16 GB of memory and running Fedora 39 Linux. The laptop was plugged into power and was set to performance mode. Clients were run on a desktop, through a Windows sub-system for Linux 2 (WSL2) installation of Ubuntu 20.04 LTS. The desktop had an AMD Ryzen-7700x processor at stock settings, with 32 GB of memory. WSL2 had access to all 16 logical processes (8 cores) and 16 GB of memory. The laptop and desktop were connected through a 100 Mb/s Wi-Fi connection. 
+
+The main metric that was being measured during this testing process was the processing time of the server. How long, on average, would it take for the server to process a request from the frontend under different loads? To test this, the time a request was sent from the frontend was taken, which was then measured against the time the request was forwarded to the client.
+    
+An important factor to keep in mind during this experiment was the polling rate of the client. A client will poll the server for new updates every 500ms, meaning that even if the time to process a packet is 0ms, the average response time of the server would still be 250ms, as the packet does not send the request until polled by the client. This means that optimal results from this experiment should trend towards that average, with anything above 250ms being of concern.
+
+\subsubsection{Test Setup}
+Five amount of clients were tested: 1, 10, 100, 500 and 700 clients connected to the server simultaneously. More than this were also attempted, however at above 700 clients the desktop's Linux operating system stopped being able to spawn new clients, citing OS error 24 "Too many open files". View appendix section~\ref{chap:A2:oserror} to see an example of the error. It was therefore decided that 700 clients would be the upper limit of this test. That being said, 700 clients is far more than what will likely be connected to the system at one time. Each client in this test had two active capabilities, which would print to the standard output.
+
+To simulate a high server load, the program simulating a DDOS attack (described above) was used. This program ran with 100 iterations for every number of clients, triggering each of their two capability. Each client would therefore have 200 requests, as fast as the server could receive them. Keeping the iterations the same for every run gave an advantage to the smaller number of clients, as not only did the server have to deal with fewer clients, but also less total requests. That being said it is a worthwhile trade-off, as this is mainly a test of how many requests the server can handle, before slowing down. The number of clients mainly has an impact on memory usage, not on performance. In this case that main way of scaling requests was simply to increase clients. Additionally, it also gives the server an advantage, due to the way the server code is written. Each client can be accessed independently, at the same time (by multiple cores or threads). However, due to the use of mutual exclusion, each client could only be accessed from one thread at a time. So having more requests, with less clients, would actually have a larger impact on server performance than the other way around.
+
+\subsubsection{Results}
+\begin{center}
+    \textbf{Table of Test Results:} 
+\begin{tabular}{ |c|c|c| } 
+ \hline
+ Clients / Total Requests & Mean Response Time & Median Response Time\\ 
+ \hline
+ 1 / 200 & 378.3333333 & 379 \\ 
+ \hline
+ 10 / 2000 & 181.6666667 & 133.3333333 \\ 
+ \hline
+ 100 / 20000 & 244.6666667 & 240.6666667 \\ 
+ \hline
+ 500 / 100000 & 252.3333333 & 250.6666667 \\ 
+ \hline
+ 700 / 140000 & 250 & 246.3333333 \\ 
+ \hline
+\end{tabular}
+\end{center}
+\begin{figure}[h]
+\caption{Test Results Charted}
+\includegraphics[width=\textwidth]{test_results_chart.png}
+\label{fig:test_results_chart}
+\end{figure}
+
 \section{Issues found during testing}
 - Currently if signature expires, then information is lost as it already has been deleted from the server.
