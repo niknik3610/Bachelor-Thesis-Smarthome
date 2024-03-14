@@ -4,7 +4,7 @@
 Due to the server being the largest part of this project, and practically being a requirement for testing the client and frontend functionality, this will be focused on first. This section will describe defining and compiling protobuf files for API endpoints, server startup, how IOT devices are registered, security mechanisms and how concurrency was handled within the server. 
 
 \subsection{Protocol Buffers and Tonic} \label{sec:chapdesign:server:protoBufs}
-\todo{I think this section is probably fine, just talk some more about what these protobufs and method stubs will be used for}
+\todo{I think this section should be shortened}
 Protobufs are defined within ".proto" files. They use a fairly basic syntax, where the user can define a service using the "service" keyword. A service can contain many functions which a client can call, these are defined using the "rpc" keyword. You can also define the arguments this function takes and what it returns. Structs are defined using the "message" keyword, where each field is separated by a semicolon. Fields can have multiple modifiers, including optional, repeated and map. Repeated marks a field as possibly being a list, or array structure. Map marks a field as being a map data structure. Finally, messages from other files can be imported, using the import keyword and then giving the file-name \cite{protobufDocs}. For an example of a protobuf file view \textbf{\textit{protos/iot/registrationService.proto}}:
 
 \begin{lstlisting}[language=protobuf3, style=boxed]{iot/registrationService.proto}
@@ -766,7 +766,4 @@ def verify_signature_update_request(
     )
 \end{lstlisting}
 The current expiration time for a signature (and in extension message) is 10 seconds. This ensures that an attacker cannot use a replay attack to maliciously control the system and if something goes wrong during packet transfer, that outdated packets don't influence behavior. The client's verifying key, which is used to check the validity of the signature, is derived from the client's public key during registration.
-
-\section{Networking} \label{sec:chapimpl:networking}
-\todo{write this}
 

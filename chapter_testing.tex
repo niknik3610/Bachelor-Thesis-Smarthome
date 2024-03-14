@@ -148,13 +148,13 @@ To simulate a high server load, the program simulating a DDOS attack (described 
  \hline
  1 / 200 & 378.3333333 & 379 \\ 
  \hline
- 10 / 2000 & 181.6666667 & 133.3333333 \\ 
+ 10 / 2,000 & 181.6666667 & 133.3333333 \\ 
  \hline
- 100 / 20000 & 244.6666667 & 240.6666667 \\ 
+ 100 / 20,000 & 244.6666667 & 240.6666667 \\ 
  \hline
- 500 / 100000 & 252.3333333 & 250.6666667 \\ 
+ 500 / 100,000 & 252.3333333 & 250.6666667 \\ 
  \hline
- 700 / 140000 & 251 & 247.3333333 \\ 
+ 700 / 140,000 & 251 & 247.3333333 \\ 
  \hline
 \end{tabular}
 \end{center}
@@ -175,9 +175,9 @@ As described above, the expected mean response time was 250ms, due to the 500ms 
 \label{fig:server_cpu_load}
 \end{figure}
 
-These test results clearly show that 700 clients are not enough to create a significant enough load on the server, that it would start struggling to process packets. This is a good result, as the server is running on mid-range, laptop hardware. Additionally, realistically very few users of the software would have a need of 700 clients running on the server. It however does give a good indication of how the software might run on less powerful hardware.
+These test results clearly show that 700 clients are not enough to create a significant enough load on the server, that it would start struggling to process packets. This is a good result, as the server is running on mid-range, laptop hardware. Additionally, realistically very few users of the software would have a need of 700 clients running on the server, especially while receiving 140,000 requests (that's nearly 7000 requests per second, seeing as the test took just over 20 seconds to run). It however does give a good indication of how the software might run on less powerful hardware.
 
-Figure~\ref{fig:server_cpu_load} shows the CPU load during the test with 700 clients. There is a significant spike around 40 seconds, when the requests started to flood in, then the load decreases again around 25 seconds, when the server is done processing the requests. Here we can see that all CPU cores/logical processes are under load during this time, which means the concurrent handling of requests is working as intended. We can also see that the maximum load it reaches is under 60 percent. This indicates that there is still room to add more clients, especially if one factors is in that server is also simultaneously running the DDOS attack, which would create additional load. These values were captures using the Gnome "System Monitor" application.
+Figure~\ref{fig:server_cpu_load} shows the CPU load during the test with 700 clients. There is a significant spike around -40 seconds, when the requests started to flood in, then the load decreases again around -18 seconds, when the server is done processing the requests. Here we can see that all CPU cores/logical processes are under load during this time, which means the concurrent handling of requests is working as intended. We can also see that the maximum load it reaches is under 60 percent. This indicates that there is still room to add more clients, especially if one factors is in that server is also simultaneously running the DDOS attack, which would create additional load. These values were captures using the Gnome "System Monitor" application.
 
 \section{Conclusions from Testing}
 One major issue was discovered while performance testing the server. The simulated clients were run on a different machine than the usability testing, for performance reasons. Specifically, this machine was running the Windows operating system. While the server accepts Unix time-stamps as timestamps, which means timezones should not matter, the time on individual machines can vary by milliseconds, to a few seconds, simply due to clock drift. Due to this fact, the Windows computer's clock had drifted into the future by milliseconds which lead to the time check not working for signature checks. As the client's time was ahead of the server's time, this lead to the simple calculation to check a packets age to return negative numbers, marking every packet as invalid. The performance tests were run with this time check disabled. This issue has since been fixed, by taking the absolute value of the difference in times, meaning the time check should work, even with slightly mismatched times.
