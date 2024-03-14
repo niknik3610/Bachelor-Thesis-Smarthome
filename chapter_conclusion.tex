@@ -1,1 +1,27 @@
-\chapter{Conclusion} \label{cha:conclusion}
+\chapter{Discussion \& Conclusion} \label{cha:conclusion}
+\section{Review of Aims}
+\begin{enumerate}
+    \item \textbf{Build a Server with an API for the smart home devices to communicate with}. 
+    
+        This was the main goal of this paper. Throughout the process of this project, a smart home server was created, which has three APIs. One for devices to communicate with and two for frontends to communicate with. This server accepts device requests to connect, allows these devices to advertise their currently available features/capabilities and allows a frontend to request control of these capabilities. It then forwards these requests to devices. Additionally, it provides security features, such as certificates and signature signing, to verify that devices are who they say they are. This server is performant enough to handle hundreds of clients to connect and receive requests at once, even on midrange hardware. \todo{Write documentation for the server API and then write about that :|}.
+
+    \item \textbf{Create a Library and API for building smart home devices.}
+
+        After creating a server for devices to connect to, a generalized Rust library was created, which allows programmers to easily create their own smart home devices and connect them to the server. This library also provides documentation for how to use it and is published on the official \href{https://crates.io/crates/NOSHP-Client}{Rust library database}. Additionally, an example IoT device was also built using this library, to provide developers a starting point and give an example of how to use the library. 
+
+    \item \textbf{Create a frontend which will allow for control of devices connected to the system.}
+
+        Throughout this project two frontends were created. One of these, also programmed in Rust and using gRPC, allows for control of devices through the commandline. This was often used during the beginning of the project, as it allowed me to quickly test new features and iterate quickly. The second is a web-frontend, which allows the user to control the server through the browser. This was created once the server functionality was more complete. The web and CLI frontend have feature parity, however both are supposed to serve more of a guide on how to use the two different APIs (gRPC and JSON + HTTP), only providing required functionality (such as device control), while missing features a real user might want, such as access control.
+
+    \item \textbf{All code should be hosted in a public repository, with documentation for how to build and use every component of the system.}
+
+        While documentation is not as detailed as it could be, all code is hosted in a \href{https://github.com/niknik3610/IoT_Platform}{public repository}, with instructions on how to build and run all components of the program. Additional focus was put on documentation of the client library/API, as this is the main piece that other programmers are expected to interface with. An example client was even created to help developers interface with the library.
+\end{enumerate}
+
+\section{Future Work}
+While this project is finished in terms of the aims of this report, it is far from done from an end-users perspective. There are some important, somewhat basic, features missing, such as access control, allowing device reconnection on connection loss, and general device features. However, in my eyes, the most important future work would be to audit and strengthen security measures. While the certificates and signatures currently implemented are a good start, the reality is that implementing a truly robust security system is not only out of the scope of this report, but also not plausible for someone with fairly little knowledge in system security to implement correctly. It is for this reason specifically that this smart home system is not ready for real life use, even if the feature-set is mostly ready. If the security measures could be audited and improved by a security expert, then this system would truly be ready for real-life adoption.
+
+\section{Concluding Remarks \& Learning Outcomes}
+This project has been incredibly educational in a multitude of aspects. Working in a multithreaded, low level systems' language to build a real project taught me a lot about the importance of Mutual Exclusion and optimization through Read/Write locks. Interfacing with multiple libraries, in both Rust and JavaScript, gave insights on reading documentation and using other people's code. Working with multiple devices, communicating over a wireless network, while sometimes frustrating, taught me a lot of important networking knowledge. Simply working on the same project for months, with no instructions or predefined goals, apart from those I set myself, was a learning experience in itself, that I have not really been able to experience throughout my time at university. I cannot begin to list all the things that I have learned throughout this process. 
+
+In conclusion, while this project has areas that it can be improved upon, it was largely a success. I personally learned a lot and grew as a developer throughout the process and produced something that I can be proud of, while gaining knowledge that will surely carry on into my future career.
