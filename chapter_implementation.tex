@@ -531,43 +531,8 @@ If the request was successful, then the next time the client polls the server, t
 \subsubsection{Implementation}
 This section will give a description of how the CLI frontend functions and some design decisions made throughout. 
 
-The CLI frontend is relatively simple when compared to the rest of this system. All logic is contained in the file \textit{\textbf{backend/src/frontend/frontend.rs}}. It uses gRPC to communicate with the server, using the same gRPC server as the devices. In fact, any device could also act as a frontend and vice-versa. The frontend API is defined within \textit{\textbf{protos/frontend}}. For example, the defintion for frontend definition is defined in \textit{\textbf{protos/frontend/registrationService.proto}} and looks like this:
+The CLI frontend is relatively simple when compared to the rest of this system. All logic is contained in the file \textit{\textbf{backend/src/frontend/frontend.rs}}. It uses gRPC to communicate with the server, using the same gRPC server as the devices. In fact, any device could also act as a frontend and vice-versa. The frontend API is defined within \textit{\textbf{protos/frontend}}. For example, the defintion for frontend definition is defined in \textit{\textbf{protos/frontend/registrationService.proto}} and can be seen in appendix section~\ref{chap:A2:frontendApiDefinition}. 
 
-\begin{lstlisting}[language=protobuf3, style=boxed, showstringspaces=false]{}
-syntax = "proto3";
-package frontend.registration;
-import "frontendTypes.proto";
-
-service FrontendRegistrationService {
-    rpc Register(RegistrationRequest) 
-        returns (RegistrationResponse);
-    rpc GetConnectedDevices(ConnectedDevicesRequest)
-        returns (ConnectedDevicesResponse);
-};
-
-message RegistrationRequest {
-    string device_name = 1;
-}
-
-message RegistrationResponse {
-    string client_id = 2;
-}
-
-message ConnectedDevicesRequest {
-    string client_id = 1;
-}
-
-message ConnectedDevicesResponse {
-    repeated Device devices = 1;
-}
-
-message Device {
-    string device_name = 1;
-    string device_uuid = 2;
-    repeated frontend.types.DeviceCapabilityStatus 
-        capabilities = 3;
-}
-\end{lstlisting}
 The frontend gRPC API has two functions, "Register" and "GetConnectedDevices". The Register function is used to register the frontend with the server. The frontend will then assign it an identifier, with which it can make requests. The GetConnectedDevices function is used by the frontend when the user requests connected devices. The server will respond with the device name, it's ID and any capabilities the device has. The server only responds with capabilities that are currently available.
 
 \subsection{Web Frontend} \label{sec:chapimpl:frontend:web}
@@ -590,41 +555,8 @@ The designs look fairly similar, with the only real difference being Github icon
 \subsubsection{Calling the frontend API from the Web}
 There are two ways to call the frontend API, one through JSON using an HTTP server, the second through gRPC. For the reasoning behind this view subsection~\ref{sec:chapimpl:frontend:json}. The web-frontend uses the JSON API to make calls to frontend API endpoints. All this means for a user of the system, is that they will need to start the server with the \textit{"-{}-json-frontend} flag, to enable the HTTP server that allows for JSON calls.
 
-Once the HTTP server has been enabled, calling the frontend API is fairly easy. The vue\_frontend (which houses all web frontend files) contains a simple script which can used to generate JS files and with Typescript type definitions from the protobuf definitions.The script uses a Javascript library called ProtobufJs, to generate these files. Once these files are available, all types used in the CLI frontend are now also available, making calling the frontend API very easy. Below is a typescript code snippet from \textit{\textbf{vue\_frontend/src/backend\_calls/registration.ts}}:
+Once the HTTP server has been enabled, calling the frontend API is fairly easy. The vue\_frontend (which houses all web frontend files) contains a simple script which can used to generate JS files and with Typescript type definitions from the protobuf definitions.The script uses a Javascript library called ProtobufJs, to generate these files. Once these files are available, all types used in the CLI frontend are now also available, making calling the frontend API very easy. A typescript code snippet that shows how calls can be made to the JSON Proxy server can be seen in appendix section~\ref{chap:A2:apicallsjsonproxy}.
 
-\begin{lstlisting}[language=ES6, style=boxed, showstringspaces=false]{}
-import { API_REGISTRATION_ADDRESS } from "@/api_call_links";
-import { Result, errAsync, okAsync } from "neverthrow";
-import { frontend } from "@/generated/generated";
-
-export async function registerSelf(deviceName: string)
-: Promise<
-    Result<frontend.registration.RegistrationResponse, Error>
-> {
-    const req = 
-        new frontend.registration.RegistrationRequest({
-            device_name: deviceName,
-        });
-
-    const res = await fetch(API_REGISTRATION_ADDRESS, {
-        method: "POST",
-        body: JSON.stringify(req),
-        headers: {
-            "Content-type": 
-                "application/json; charset=UTF-8",
-        },
-    });
-
-    try {
-        const parsed: 
-            frontend.registration.RegistrationResponse =
-                await JSON.parse(await res.text());
-        return okAsync(parsed);
-    } catch (e) {
-        return errAsync(new Error("Malformed Api Response"));
-    }
-}
-\end{lstlisting}
 
 In this typescript snippet we construct a new "RegistrationRequest", send it in the JSON format to the server. We then await a response and parse it into a "RegistrationResponse" and return that. The address used for this is defined in the \textit{\textbf{api\_call\_links.ts}} file. In this case being "/api/frontend/registration", with the fetch request being made to the domain the server is on (in this case http://localhost:5173). due to the "/api" prefix in the address, the request is automatically forwarded to the HTTP server. Without the "/api" prefix, the site at "/frontend/registration" would be requested instead, returning a 404 Not Found error, instead of an API response. All of this is handled by the Vite web server, which is hosting the website.
 
