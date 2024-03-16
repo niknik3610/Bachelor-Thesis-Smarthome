@@ -1,4 +1,6 @@
 \chapter{Design} \label{cha:design}
+This chapter will describe a variety of design decisions made throughout the process of this project. It aims to give a higher level overview of how systems work, in comparison to the implementation chapter of this report. It will detail different technology used throughout project and the reasons behind these choices and also give a higher-level, more mathematical view of the security measures implemented. Finally, it will show preliminary designs of the web-frontend.
+
 \section{Technology Choices} \label{sec:chapdesign:technology}
 This section will discuss choices that have been made throughout the project regarding technology used and justifications for their usage.
 
@@ -12,6 +14,8 @@ There were a few requirements when choosing an appropriate programming language 
 
 \end{enumerate}
 The language that was chosen for this project was Rust. While C/C++'s performance rivals and often surpasses Rust, the difference is often quite marginal \cite{PerformanceEvalOnMicrocontroller}, due to all three being compiled to machine code. What makes Rust different, is its headline feature, known as the "borrow checker". It can ensure that at compile-time, the code is memory safe. Due to the code being guaranteed memory safe at compile time, outside explicitly marked unsafe blocks, Rust code is known for its ability to run long-term without running into crashes. Additionally, Rust code is a popular choice for embedded devices, due to being able to compile without a standard library, giving it flexibility in a project such as this. Finally, even though it is known as a difficult language to learn and master, personal familiarity with Rust makes it an obvious choice for this project.
+
+\textbf{Note:} throughout this report some Rust terms, such as library and crate, will be used interchangeably. They are however different in certain ways. For a full explanation of some of these terms view appendix section~\ref{cha3:rustterms}.
 
 \subsection{gRPC} \label{sec:chapdesign:technology:grpc}
 gRPC is an RPC implementation released by Google in 2015. It uses Protocol Buffers (protobufs) as an interface definition language (IDL), to define services on servers, that clients can then call. The server runs a gRPC server and the client runs the gRPC client \cite{grpcHomepage}. Protobufs can be compiled to many different languages, including Rust and Typescript. In a performance comparison between REST, gRPC, websockets and GraphQL, gRPC came out ahead in many different metrics \cite{reviewOfInternetProtocols} in both native and containerized tests. In fact, gRPC was the most performant internet communication protocol in all metrics apart from memory usage.

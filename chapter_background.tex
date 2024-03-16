@@ -1,4 +1,5 @@
 \chapter{Literature Review} \label{cha:chapter2}
+This section will provide an in-depth analysis of different concepts mentioned in the litartuare related to building an IoT-System, specifically a Smart Home. This includes different IoT architectures, important factors that make a successful IoT system and different types of API designs. 
 
 \section{IoT System Architectures} \label{sec:chap2:architectures}
 Kamienski et al. describe a simple three layer architecture of an IoT system in \cite{DesigningOpenIotSystem}. Within this architecture, the top layer is the "Input System", from which any data that will influence the decisions of the IoT system will come from. Included in this are sensors, but also user facing interfaces. The second layer, known as the "Process System", is where any algorithms are run and system behavioral decisions are made. The goal of this layer is to gain an "improved understanding of the system where the  data comes from" \cite{DesigningOpenIotSystem}. The bottom layer is the "Output System", which are where decisions made by the Process System will be enacted. This is often represented as the devices connected to the IoT system.
@@ -27,7 +28,7 @@ There are some specific constraints specific to Smart Homes. Reliability is a ke
 \todo{further add to this section, just not sure what yet}
 
 \section{APIs and Web Interfaces} \label{sec:chap2:API}
-The book "Designing Web APIs" makes an important distinction about APIs that can often be forgotten by developers. "Although APIs are designed to work with other programs, they’re mostly intended to be understood and used by humans writing those other programs" \cite{DesigningWebApis} (Chapter 1). Do to this reality, one must remember to design APIs appropriately. To help the API designer in doing that, there are multiple pre-defined architectural standards that they can use. 
+The book "Designing Web APIs" makes an important distinction about APIs that can often be forgotten by developers. "Although APIs are designed to work with other programs, they’re mostly intended to be understood and used by humans writing those other programs" \cite{DesigningWebApis} (Chapter 1). Due to this reality, one must remember to design APIs appropriately. To help the API designer in doing that, there are multiple pre-defined architectural standards that they can use. 
 
 \subsection{Request Response}
 "Request Response" APIs (RRA) expose their interface through a web server, to which clients can make requests. A client will request data and will receive a response from the server. Common formats for requests and responses include JavaScript Object Notation (JSON) and Extensible Markup Language (XML). \cite{DesigningWebApis}. 

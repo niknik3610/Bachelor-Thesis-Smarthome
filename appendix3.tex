@@ -1,0 +1,8 @@
+\chapter{Terminology}
+
+\section{Rust Terminology Explained} \label{cha3:rustterms}
+This section contains a simple list of Rust terms and their meaning in relation to traditional programming terms.
+\begin{itemize}
+    \item Crate: Rust's version of a library. Due to the way generics are handled at compile-time in Rust, Rust libraries are usually shipped as their source code, therefore they are not technically libraries in the traditional sense of the word. This also means that most Rust crates are open-source and need to be compiled at least once. This is part of the reason that Rust projects, especially ones with a lot of crates, take a long time to compile.
+    \item Trait: The equivalent of an interface in Rust. If a struct wants to implement a certain trait, they will need to implement all functions defined in that trait. This allows for powerful behavior with generics.
+\end{itemize}

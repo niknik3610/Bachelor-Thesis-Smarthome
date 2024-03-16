@@ -1,4 +1,5 @@
 \chapter{Testing \& Evaluation} \label{cha:testing}
+This chapter will provide details on usability and performance tests carried out on the completed system and will provide some analysis of results gathered through these.
 \section{Using the System}
 To test Aims and Objectives 1 \& 2, \todo{finish this section}
 
@@ -42,7 +43,7 @@ You can view the complete code for the client used in this example in the append
 This section will be a continuation of the last section, except that multiple devices will now be run, instead of just one. One device will still be run off the Raspberry Pi, the other devices will be run locally, on the server. They will however still be connecting to the public IP Address, not the loop-back address. Running them on the same device as the server has potential performance implications, however it is not relevant to this section, as we are simply attempting to test the functionality of the system.
 
 \subsubsection{Testing}
-One slight modification has been made to the code in appendix section~\ref{chap:A2:onedeviceclientlib}, a print statement has been added to the main function, which prints the device name to standard output. This aids in clarity for which device is which in the screenshots. Additionally, configurations have slightly changed, with each device having uniquely named capabilities and device names, to demonstrate the frontend's ability to show different devices. The IP address they are connecting to will stay the same (the server's IP printed at startup).
+One slight modification has been made to the client code in appendix section~\ref{chap:A2:onedeviceclientlib}, a print statement has been added to the main function, which prints the device name to standard output. This aids in clarity for which device is which in the screenshots. Additionally, configurations have slightly changed, with each device having uniquely named capabilities and device names, to demonstrate the frontend's ability to show different devices. The IP address they are connecting to will stay the same (the server's IP printed at startup).
 
 \begin{figure}[h]
 \caption{Establishing Connection with four devices}

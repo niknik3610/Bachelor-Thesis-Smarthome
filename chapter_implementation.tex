@@ -1,4 +1,5 @@
 \chapter{Implementation} \label{cha:implementation}
+This chapter aims to provide a low-level, in-depth explanation of how a variety of systems work throughout the project's codebase. It provides code samples, with explanations of what that code is doing, to give insight into how this project was built. It does this through describing all aspects of the Registration Service. Throughout, how devices connect using the Registration Service, how these devices are registered in the server and how this information is reflected on the frontend are described in detail. This information can then be extrapolated to the other services present within the overall system.
 
 \section{Backend Server \& Device Management} \label{sec:chapimpl:server}
 Due to the server being the largest part of this project, and practically being a requirement for testing the client and frontend functionality, this will be focused on first. This section will describe defining and compiling protobuf files for API endpoints, server startup, how IOT devices are registered, security mechanisms and how concurrency was handled within the server. 
