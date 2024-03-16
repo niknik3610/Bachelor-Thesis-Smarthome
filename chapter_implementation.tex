@@ -483,12 +483,12 @@ There are two ways to call the frontend API, one through JSON using an HTTP serv
 Once the HTTP server has been enabled, calling the frontend API is fairly easy. The vue\_frontend (which houses all web frontend files) contains a simple script which can used to generate JS files and with Typescript type definitions from the protobuf definitions.The script uses a Javascript library called ProtobufJs, to generate these files. Once these files are available, all types used in the CLI frontend are now also available, making calling the frontend API very easy. A typescript code snippet that shows how calls can be made to the JSON Proxy server can be seen in appendix section~\ref{chap:A2:apicallsjsonproxy}.
 
 
-In this typescript snippet we construct a new "RegistrationRequest", send it in the JSON format to the server. We then await a response and parse it into a "RegistrationResponse" and return that. The address used for this is defined in the \textit{\textbf{api\_call\_links.ts}} file. In this case being "/api/frontend/registration", with the fetch request being made to the domain the server is on (in this case http://localhost:5173). due to the "/api" prefix in the address, the request is automatically forwarded to the HTTP server. Without the "/api" prefix, the site at "/frontend/registration" would be requested instead, returning a 404 Not Found error, instead of an API response. All of this is handled by the Vite web server, which is hosting the website.
+In this typescript snippet we construct a new "RegistrationRequest", which is defined the protobuf definition file from section~\ref{sec:chapimpl:server:protoBufs}, send it in the JSON format to the server. We then await a response and parse it into a "RegistrationResponse" and return that. The request is being made to the address "http://localhost:5173/api/frontend/registration" (defined in a constant, not visible in example). While at first this seems strange, as the JSON proxy is being hosted on address "http://localhost:2302", however due to the "/api" prefix in the address, the request is automatically forwarded to the HTTP server. This is handled by the Vite web server, which is hosting the website, which is being run when we call "npm run dev".
 
 \subsection{Using JSON for the Frontend API} \label{sec:chapimpl:frontend:json}
-Throughout this report a JSON frontend API has been alluded to, this subsection will explain why it was necessary to implement this in the first place. GRPC uses the HTTP/2 protocol to communicate, which is supported by web browsers. However, some features in HTTP/2 required by gRPC are not exposed by web browser \cite{grpcWeb} for a variety of reasons, which lead to the creation of gRPC web. GRPC web functions slightly differently to normal gRPC and is not compatible with normal gRPC, due to the HTTP/2 issues. Because of this, a proxy between the normal gRPC server and gRPC web needs to be used to communicate.
+Throughout this report a JSON frontend API has been alluded to, this subsection will explain why it was necessary to implement this in the first place. GRPC uses the HTTP/2 protocol to communicate, which is supported by web browsers. However, some features in HTTP/2 required by gRPC are not exposed by web browser \cite{grpcWeb} for a variety of reasons, which lead to the creation of gRPC web. GRPC web functions slightly differently to normal gRPC and is not compatible with normal gRPC, due to the aforementioned HTTP/2 issues. Because of this, a proxy between the normal gRPC server and gRPC web needs to be used to communicate.
 
-Instead of using a seperate program as a proxy, I decided to use a JSON to GRPC translation proxy instead, running on the server. This makes it possible to use a web-based frontend, without having the additional restrictions imposed by gRPC web. The downside of this, is that another HTTP server needs to be spawned, if the user decides to use JSON. Additionally, all benefits of using GRPC with the frontend are lost, as JSON is sent anyway. That being said, there are some benefits.
+Instead of using a separate program as a proxy, I decided to use a JSON to GRPC translation proxy instead, running on the server. This makes it possible to use a web-based frontend, without having the additional restrictions imposed by gRPC web. The downside of this, is that another HTTP server needs to be spawned, if the user decides to use JSON. Additionally, all benefits of using GRPC with the frontend are lost, as JSON is sent anyway. That being said, there are some benefits.
 
 The JSON proxy I have created is completely transparent to the server, as the proxy calls gRPC functions. Additionally, the protobuf files are still used in combination with Typescript. This means that nothing in the packets is changed between the proxy and the server, the packet is simply parsed and forwarded as a gRPC packet. Another positive side effect of the JSON proxy, is that most frontend developers are significantly more familiar with working with JSON than gRPC, making it easier to create a custom frontend for the system. No extra program needs to be installed, or started when using a web-based frontend, one simply needs to include a flag when starting the server and the rest is handled automatically. Finally, if a user wants to create a web frontend using gRPC web, this can easily be done, with no changes required to the server code.
 
@@ -528,52 +528,11 @@ pub async fn json_registration(
 \end{lstlisting}
 While this code looks complicated (partially due to formatting restrictions), it is actually quite simple. We parse the JSON request into a RegistrationRequest struct. If fails we send an error to the sender. We then forward the request to our "registration\_service\_client", which is a gRPC client registered as a frontend with the server. This is contained in a Mutex, due to the fact that it may be accessed concurrently, so we need to wait for it's lock to be available first. Finally, we check that the response is not an error. If it is not, we turn the response to a string and forward it to the sender, otherwise we forward the error message.
 
-In subsection~\ref{sec:chapimpl:server:protoBufs} it was mentioned that the protobuf compiler needed to implement the interfaces Serialize and Deserialize on the protobuf files in the frontend folder. The reason for this can be seen in the code snippet above. Requests that are in the form of JSON need to be turned into their corresponding Rust structs. This is done using the "serde\_json" library. If the "Serialize" and "Deserialize" traits are not implemented on structs from the protobuf file, then JSON requests will not be parsed. In fact, due to Rust's type system, the program will not even compile.
-
 \section{Security} \label{sec:chapimpl:security}
-This section will briefly showcase implementations of the protocols described within subsection~\ref{sec:chapdesign:security}. The code snippet is from the file \textit{\textbf{backend/src/server/certificate\_signing.rs}} 
+This section will briefly showcase implementations of the protocols described within subsection~\ref{sec:chapdesign:security}. Both certificates and signatures are using an RSA key-pair generated by the Rust RSA library specifically the Probabilistic Signature Scheme (pss) module. From the private and public key we can generate a signing and verification key respectively. These are then used to sign and verify the certificates.
 
 \subsection{Certificates} \label{sec:chapimpl:security:certificates}
-\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
-use rsa::{
-    pss::{BlindedSigningKey, Signature, VerifyingKey},
-    sha2::Sha256,
-    signature::{
-        Keypair, RandomizedSigner, 
-        SignatureEncoding, Verifier
-    },
-    RsaPrivateKey,
-};
-//CSR = (device_id + device_public_key)
-pub fn gen_certificate(&self, csr: &String) -> String {
-    let mut rng = rand::thread_rng();
-    let certificate = self
-        .signing_key
-        .sign_with_rng(&mut rng, csr.as_bytes())
-        .to_string();
-    certificate
-}
-//Verifies a certificate 
-pub fn verify_certificate(
-    &self,
-    certificate_from_device: String,
-    certificate_authentic: String
-) -> bool {
-    let certificate_authentic = 
-    Signature::try_from(
-        &*certificate_authentic.as_bytes()
-    ).unwrap();
-
-    match self.verification_key.verify(
-        &certificate_from_device.as_bytes(),
-        &certificate_authentic
-    ) {
-        Ok(_) => true,
-        Err(_) => false,
-    }
-}
-\end{lstlisting}
-In the gen\_certificate function, we are using the RSA Rust library, specifically the Probabilistic Signature Scheme (pss) module, to generate a digest of csr. PSS is an encoding method for digital signatures, meant to be a replacement for the popular PKCS\#1. Within the verify certificate function we simply compare the signature we know is authentic (stored when it is sent to the device), to that provided by the device. If they are the same, then we know the device is authentic. 
+Generating certificates is fairly simple, the code for this can be found in the file \textit{\textbf{backend/src/server/certificate\_signing.rs}}. We use the server's signing key to generate a digest of csr (described in section~\ref{sec:chapdesign:security}). We then store this certificate on the server side and send a copy to the device requesting to connect. To verify a certificate we simply use the verify function, present on the server's verification key.
 
 \subsection{Signatures} \label{sec:chapimpl:security:signatures}
 Signatures are similarly simple. To generate a signature for a message being sent we use the sign\_data function (from \textit{\textbf{backend/src/server/certificate\_signing.rs}}):
@@ -590,7 +549,7 @@ pub fn sign_data(&self, data: String) -> (Vec<u8>, u64) {
     (signed.to_vec(), timestamp)
 }
 \end{lstlisting}
-As mentioned in the comment on line one, this function takes data in the form of a string, concatenates it with the current time-stamp (in Unix time), then signs it with the same pss key used to sign data in the gen\_certificate function. It then returns the the signature in the form of an Array of bytes, along with the timestamp.
+As mentioned in the comment on line one, this function takes data in the form of a string, concatenates it with the current time-stamp (in Unix time), then signs it with the same pss signing key used to generate certificates. It then returns the signature in the form of an Array of bytes, along with the timestamp.
 
 Due to more complexity in the verification function, it will be provided in pseudo code. For the original Rust code, view the file \textit{\textbf{backend/src/server/certificate\_signing.rs}}. 
 \begin{lstlisting}[language=Python, style=boxed, showstringspaces=false]{}
@@ -622,5 +581,5 @@ def verify_signature_update_request(
         signature
     )
 \end{lstlisting}
-The current expiration time for a signature (and in extension message) is 10 seconds. This ensures that an attacker cannot use a replay attack to maliciously control the system and if something goes wrong during packet transfer, that outdated packets don't influence behavior. The client's verifying key, which is used to check the validity of the signature, is derived from the client's public key during registration.
+The signature verification function uses the client's verification key, derived from the client's public key, to verify that the signature is genuine. Included in the signatureis the time the message was sent (view sections~\ref{sec:chapdesign:security}) The current expiration time for a signature (and in extension a message) is 10 seconds. This ensures that an attacker cannot use a replay attack to maliciously control the system and if something goes wrong during packet transfer, that outdated packets don't influence behavior. 
 
