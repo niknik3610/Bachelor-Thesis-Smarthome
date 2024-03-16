@@ -4,9 +4,10 @@ This chapter aims to provide a low-level, in-depth explanation of how a variety 
 \section{Backend Server \& Device Management} \label{sec:chapimpl:server}
 Due to the server being the largest part of this project, and practically being a requirement for testing the client and frontend functionality, this will be focused on first. This section will describe defining and compiling protobuf files for API endpoints, server startup, how IOT devices are registered, security mechanisms and how concurrency was handled within the server. 
 
-\subsection{Protocol Buffers and Tonic} \label{sec:chapdesign:server:protoBufs}
+\subsection{Protocol Buffers} \label{sec:chapimpl:server:protoBufs}
 \todo{I think this section should be shortened}
-Protobufs are defined within ".proto" files. They use a fairly basic syntax, where the user can define a service using the "service" keyword. A service can contain many functions which a client can call, these are defined using the "rpc" keyword. You can also define the arguments this function takes and what it returns. Structs are defined using the "message" keyword, where each field is separated by a semicolon. Fields can have multiple modifiers, including optional, repeated and map. Repeated marks a field as possibly being a list, or array structure. Map marks a field as being a map data structure. Finally, messages from other files can be imported, using the import keyword and then giving the file-name \cite{protobufDocs}. For an example of a protobuf file view \textbf{\textit{protos/iot/registrationService.proto}}:
+
+Remote functions accessible through gRPC are defined in ".proto" files. They use a fairly basic syntax, where the user can define a service using the "service" keyword. A service can contain many functions which a client can call, these are defined using the "rpc" keyword. Structs are defined using the "message" keyword, where each field is separated by a semicolon. These structs will then be compiled to their corresponding datatype in whatever language you are using. For example, they are compiled to classes in Typescript or structs in Rust. This makes them useful if a datatype is shared between languages,  they can be defined in one protbuf file and used across languages. Protobuf structs contain fields, which can have multiple modifiers, including optional and repeated. Repeated marks a field as possibly being a list, or array structure, optional marks a field as optional (represented differently between languages). Finally, messages from other files can be imported. Below is the service definition for the RegistrationService, found in \textbf{\textit{protos/iot/registrationService.proto}}:
 
 \begin{lstlisting}[language=protobuf3, style=boxed]{iot/registrationService.proto}
 syntax = "proto3";
@@ -33,8 +34,7 @@ message RegistrationResponse {
 }
 \end{lstlisting}
 
-Here we define a service called "RegistrationService", with a function called Register. This function is called by IOT clients when they first attempt to connect to the server which takes a RegistrationRequest as a parameter and returns a RegistrationResponse. The file also defines two "messages", the aforementioned RegistrationRequest and RegistrationResponse. While most of the fields within them are fairly obvious, RegistrationRequest.capabilities warrants further explanation.
-    This field is repeated, meaning it is an array data structure. This array contains the type DeviceCapabilityStatus, which is defined in iot.types. We can see this type is imported at the top of the file, from "types.proto". This is the definition of DeviceCapabilityStatus:
+Here we define a service called "RegistrationService", with a function called Register. This function is called by IOT clients when they first attempt to connect to the server which takes a RegistrationRequest as a parameter and returns a RegistrationResponse. The file also defines two "messages". The capabilities field is repeated, meaning it is an array data structure. This array contains the type DeviceCapabilityStatus, which is defined in iot.types. We can see this type is imported at the top of the file, from "types.proto". This is the definition of DeviceCapabilityStatus:
 
 \begin{lstlisting}[language=protobuf3, style=boxed]{iot/types.proto}
 message DeviceCapabilityStatus {
@@ -43,57 +43,7 @@ message DeviceCapabilityStatus {
 }
 \end{lstlisting}
 
-In summary, if an IOT device wants to register with this server, they will need to call the Register server stub. The server stub takes one parameter, the RegistrationRequest message. This message requires the client to give it's public key, it's display name and an array of "DeviceCapabilityStatus". The Register function then returns a RegistrationResponse. For more information on this topic, view subsection~\ref{sec:chapimpl:server:registration}
-
-To compile these server stubs to Rust we will be using the aforementioned Rust "Tonic" crate. To do this first we must add the "Tonic" crate to our project, then add "tonic-build" to our build dependencies (view Cargo Documentation). We then create a build.rs file, which is run when the Rust compiler (Cargo) builds the program. You can view the file \textbf{\textit{backend/build.rs}} below:
-
-\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{backend/build.rs}
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tonic_build::compile_protos(
-        "../proto/iot/types.proto"
-    )?;
-    tonic_build::compile_protos(
-        "../proto/iot/registrationService.proto"
-    )?;
-    tonic_build::compile_protos(
-        "../proto/iot/requestUpdateService.proto"
-    )?;
-    tonic_build::compile_protos(
-        "../proto/iot/deviceControlService.proto"
-    )?;
-
-    tonic_build::configure()
-        .type_attribute(
-            ".", 
-            "#[derive(serde::Deserialize, serde::Serialize)]"
-        )
-        .compile(
-            &[
-                "../proto/frontend/registrationService.proto",
-                "../proto/frontend/frontendTypes.proto",
-                "../proto/iot/types.proto",
-                "../proto/frontend/deviceControlService.proto",
-            ],
-            &["../proto/frontend", "../proto/iot"],
-        )?;
-    Ok(())
-}
-\end{lstlisting}
-
-In line 2-13 we are telling tonic\_build, using prost under the hood (which in turn calls the protobuf compiler), to compile the files required for Device \& Server communication. We do this by calling the \textit{compile\_protos} function. The files in the folder \textit{proto/iot} are the ones used by IOT devices. This is quite simple to use, however is technically a build script, making the statement in subsection~\ref{sec:chapdesign:technology:grpc} partially untrue. Line 15-28 are where frontend protobuf files are compiled. These require the traits (Rust equivalent to interfaces in other languages) "Serialize" and "Deserialize" to be implemented for all structs compiled from the files. We therefore require this special syntax when compiling them. For more information on why they need these traits, view subsection~\ref{sec:chapimpl:frontend:json}.
-
-Note that the words crate and library will be used interchangeably throughout this report, due to them being very similar concepts, but library being more familiar to non-rust users.
-
-Finally, protobuf server-stubs and messages can be imported into Rust using a macro provided by tonic. View below how \textbf{\textit{backend/src/server/registration.rs}} imports the \textit{protos/iot/registration.proto} file:
-
-\begin{lstlisting}[language=Rust, style=boxed]{server/registration.rs}
-use crate::types::types;
-pub mod registration_service {
-    tonic::include_proto!("iot.registration");
-}
-\end{lstlisting}
-
-In order to import the compiled protbuf file, we simply call the "include\_proto" macro (it being a macro is indicated by the \textbf{!}). Note that we need to import the types module first, as this module contains the compiled \textit{protos/iot/types.proto} file, which is imported by \textit{registration.proto}. Additionally, instead of giving the file path to the protobuf file, we simply give the module name, which is also defined in the protobuf file.
+In summary, if an IOT device wants to register with this server, they will need to call the Register server stub. The server stub takes one parameter, the RegistrationRequest message. This message requires the client to give it's public key, it's display name and an array of "DeviceCapabilityStatus". The Register function then returns a RegistrationResponse. To see how this service is implemented on the server, view subsection~\ref{sec:chapimpl:server:registration}.
 
 \subsection{Server Start Up} \label{sec:chapimpl:server:startup}
 This section will describe what is done when the server first starts. It will give a general overview of startup and the details of starting a gRPC and HTTP server in Rust. For more details, view the main function within \textit{\textbf{/backend/src/server/server.rs}}.
@@ -109,7 +59,7 @@ Startup of the server is currently quite simple:
 Command line (CLI) arguments are parsed using a Rust library called "Clap". Currently the only commandline argument that can be passed is running the optional HTTP server, which enables using JSON for the frontend (view subsection~\ref{sec:chapimpl:frontend:json}), however there are plans to include other arguments, such as giving an IP address or Port for the gRPC server to run on as an argument. Currently, the computer's IP address is discovered automatically using a crate called "local-ip-address". 
 
 \subsubsection{Creating gRPC Services}
-Next gRPC services are instantiated. GRPC services in Rust take the form of structs that implement the trait (interface) defined as a service within a protbuf file. Take for example, the "RegistrationService" from \textbf{\textit{protos/iot/registrationService.proto}}, defined in subsection~\ref{sec:chapdesign:server:protoBufs}:
+Next gRPC services are instantiated. GRPC services in Rust take the form of structs that implement the trait (interface) defined as a service within a protbuf file. Take for example, the "RegistrationService" from \textbf{\textit{protos/iot/registrationService.proto}}, defined in subsection~\ref{sec:chapimpl:server:protoBufs}:
 \begin{lstlisting}[language=protobuf3, style=boxed, showstringspaces=false]{}
 service RegistrationService {
     rpc Register(
@@ -138,7 +88,7 @@ impl RegistrationService for ClientRegistrationHandler {
 }
 \end{lstlisting}
 
-Where "RegistrationService" is the trait we are implementing and "ClientRegistrationHandler" is the name of the struct it is being implemented on. If the trait is implemented correctly, this struct is now a service and, after being handed to the gRPC server struct, this function can then be called using an RPC through gRPC. In other words, any gRPC client that is connected to this gRPC server can now call this function, as long as their programming language supports it.
+Where "RegistrationService" is an interface, defined in a protobuf file (view subsection~\ref{sec:chapimpl:server:protoBufs}). "ClientRegistrationHandler" is the name of the struct this interface is being implemented on. If the interface is implemented correctly, this struct is now a service and, after being handed to the gRPC server struct, this function can then be called using a RPC through gRPC. In other words, any gRPC client that is connected to this gRPC server can now call this function, as long as their programming language supports it.
 
 \subsubsection{Starting the gRPC Server}
 After implementing all services defined in the protobuf files on appropriate structs, the gRPC server can now be started. This is done in the following code snippet from \textit{\textbf{/backend/src/server/server.rs}}:
@@ -193,14 +143,14 @@ For code beyond the above provided abbreviated snippets view the file \textbf{\t
 This section will give an overview of the server's response to a device registration attempt. For information about how registration is performed on a device, view subsection~\ref{sec:chapimpl:devicelib:registration}
 
 Figure~\ref{fig:server_registration} shows the process of the server receiving a registration request from a client:
-
 \begin{figure}[h]
 \caption{Simplified Diagram of Device Registration}
 \includegraphics[width=\textwidth]{device_registration}
 \label{fig:server_registration}
 \end{figure}
+
 When a device wants to connect to the server, it uses the "Register" function from the "RegistrationService" through gRPC. To do so, it must first create a "RegistrationRequest", the contents of which are detailed within the \textit{\textbf{proto/iot/registration.proto}} protobuf file:
-\pagebreak
+
 \begin{lstlisting}[language=protobuf3, style=boxed, showstringspaces=false]{}
 message RegistrationRequest {
     string public_key = 1;
@@ -215,7 +165,7 @@ message DeviceCapabilityStatus {
     string capability = 2;
 }
 \end{lstlisting}
-This is the same protobuf code detailed in subsection~\ref{sec:chapdesign:server:protoBufs}. The "RegistrationRequest" contains the device's public key and its display name. The public key will be used for encryption and signing, the name is what the device is called on the frontend-interface. The final field is an array of type "DeviceCapabilityStatus", which is a message (struct) with two fields. A capability in this system represents something the device can do. This takes the form of a string. If a capability is available, that means the server relays that capability to any frontend devices connected to the server. If it is not available, the server still keeps that information, but does not relay it to frontends. 
+This is the same protobuf code detailed in subsection~\ref{sec:chapimpl:server:protoBufs}. The "RegistrationRequest" contains the device's public key and its display name. The public key will be used for encryption and signing, the name is what the device is called on the frontend-interface. The final field is an array of type "DeviceCapabilityStatus", which is a message (struct) with two fields. A capability in this system represents something the device can do. This takes the form of a string. If a capability is available, that means the server relays that capability to any frontend devices connected to the server. If it is not available, the server still keeps that information, but does not relay it to frontends. 
 
 A simple example of a capability is one for a lamp. A lamp could have two capabilities, "turn on" and "turn off". If the lamp is off, the capability "turn on" is available to the user. If the user decides to invoke that capability, the lamp will turn on, the "turn on" capability will no longer be available and the "turn off" capability will become available. 
 
@@ -241,7 +191,6 @@ pub struct Device {
 }
 \end{lstlisting}
 The structure of a device is quite self-explanatory, the only thing of note is having the UUID as two fields, one time as the UUID struct and once as a string. This is due to the type conversion being done very often in certain sections of code, it made sense to do this conversion once and reuse it.  
-    Note that in the current system, a device needs to re-register every time the server restarts. It doesn't need to re-register on device restart, as long as the certificate and UUID are retained. An easy way for the server to save devices, so they can be remembered after restarting would be to serialize the hash map which maps UUIDs to Device structs and then to load this at startup. However, this would require more advanced logic to decide when to kick inactive devices out of the hash map and could lead to unforeseen bugs. Therefore, it is another possible extension of the project for the future.
 
 \subsection{Device \& Server Communication}
 Device and Server communication happens through polling. Every 0.5 seconds the device sends a request through the "RequestUpdateService" to the server. The service is defined in the \textit{\textbf{/protos/iot/requestUpdateService.proto}} file:
@@ -249,33 +198,8 @@ Device and Server communication happens through polling. Every 0.5 seconds the d
 service RequestUpdateService {
     rpc PollForUpdate(PollRequest) returns (PollResponse);
 };
-
-message PollRequest {
-    string certificate = 1;
-    string uuid = 2;
-    repeated iot.types.DeviceCapabilityStatus 
-        updatedCapabilities = 3;
-};
-
-message PollResponse {
-    PollingOption hasUpdate = 1;
-    repeated Update updates = 2;
-};
-
-enum PollingOption {
-    UNKNOWN = 0;
-    NONE = 1;
-    SOME = 2;
-    DEVICE_NOT_FOUND = 3;
-}
-
-message Update {
-    string capability = 1;
-    bool hasValue = 2;
-    int32 value = 3;
-}
 \end{lstlisting}
-The "RequestUpdateService" has one function, named "PollForUpdate". It accepts a "PollRequest" as a parameter and returns a "PollResponse". When a device requests an update from the server, it must provide it's UUID and certificate, so the server knows what device is requesting and so the server can ensure that the device is who it says it is. Additionally, it provides it's updated list of capabilities. Below is some pseudocode to show how the server creates a response (you can view the real function in file \textit{\textbf{backend/src/server/polling.rs}}): \todo{add signature to this}
+The "RequestUpdateService" has one function, named "PollForUpdate". It accepts a "PollRequest" as a parameter and returns a "PollResponse". When a device requests an update from the server, it must provide its UUID, certificate, a timestamp of when it was sent and the signature of the message, so the server knows what device is requesting and so the server can ensure that the device is who it says it is. Additionally, it provides it's updated list of capabilities. Below is some pseudocode to show how the server creates a response (you can view the real function in file \textit{\textbf{backend/src/server/polling.rs}}): \todo{add signature to this}
 
 \begin{lstlisting}[language=Python, style=boxed, showstringspaces=false]{}
 def poll_for_update(self, request):
@@ -314,11 +238,11 @@ def poll_for_update(self, request):
         updates: updates_clone
     )
 \end{lstlisting}
-In summary, when the poll\_for\_update function receives a request, it first checks if the device has updated capabilities. This can happen if something has changed with the device since the last poll or since registration. If the device has updates capabilities, then they are replaced and the frontend cache is invalidated. The frontend cache being invalidated means that some values need to be recalculated next time a frontend requests information about this device, instead of simply using the previous values.
+When the poll\_for\_update function receives a request, it first checks if the device has updated capabilities. This can happen if something has changed with the device since the last poll or since registration. If the device has updates capabilities, then they are replaced and the frontend cache is invalidated. The frontend cache being invalidated means that some values need to be recalculated next time a frontend requests information about this device, instead of simply using the previous values.
 
-Next the function checks if any events are available for the device in question. Events in this case are generated by the frontend. For example, when the frontend activates capability "turn\_on", an event is created on the server for the corresponding device. When the device then requests updates, this event is sent to the device and the device can respond accordingly. Within the PollResponse struct (view the protobuf definition above), the "hasUpdate" field corresponds to the status of events. If the server responds with NONE, this means that no events are available, if it responds with SOME then the updates field contains updates. While the client could simply check for the length of the updates array, "hasUpdate" also provides some error handling, such as reporting if the device was not found or if some error occurred.
+Next the function checks if any events are available for the device in question. Events are created by the user on the frontend. For example, when the frontend activates capability "turn\_on", an event is created on the server for the corresponding device. When the device then requests updates, this event is sent to the device and the device can respond accordingly. The server will include in the poll response, an indicator if new events are available, or an error code. If events are available they will also be included in the message.
 
-When the client receives the response to their poll, they can then decide what to do with the events they have received, the server does not define any behavior. It simply reports to the client any events that have happened. This choice was made to enable a programmer to better define device behaviour themselves and prevents issues with the server and device being out of sync about what behaviors are available. The downside of this, is that the server cannot guarantee to the frontend that anything has happened when a button is clicked. It also cannot give feedback until the event is processed by the IoT device. Another downside is that it leads to more calculation being done on the IoT device itself.
+When the client receives the response to their poll, they can then decide what to do with the events they have received, the server does not define any behavior. It simply reports to the client any events that have happened. This choice was made to enable a programmer to better define device behavior themselves and prevents issues with the server and device being out of sync about what behaviors are available. The downside of this, is that the server cannot guarantee to the frontend that anything has happened when a button is clicked. It also cannot give feedback until the event is processed by the IoT device. Another downside is that it leads to more calculation being done on the IoT device itself and can potentially lead to lost updates if the device itself malfunctions.
 
 
 \subsection{Threads \& Concurrency} \label{sec:chapimpl:server:threads}
@@ -465,7 +389,7 @@ def register_self(
         response.certificate
     )
 \end{lstlisting}
-The RegistrationServiceClient is the counterpart to the RegistrationServiceServer used by the gRPC server and is imported from the generated code from the RegistrationService protobuf file. We use the client returned by the "connect" method on the RegistrationServiceClient, to call the RPC function "register" (view subsection~\ref{sec:chapdesign:server:protoBufs} for more information on how RPC functions are defined). This then returns the fields required for communication with the server. Finally, we return the ServerConnection struct which is a basic struct from the client library defined as:
+The RegistrationServiceClient is the counterpart to the RegistrationServiceServer used by the gRPC server and is imported from the generated code from the RegistrationService protobuf file. We use the client returned by the "connect" method on the RegistrationServiceClient, to call the RPC function "register" (view subsection~\ref{sec:chapimpl:server:protoBufs} for more information on how RPC functions are defined). This then returns the fields required for communication with the server. Finally, we return the ServerConnection struct which is a basic struct from the client library defined as:
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
 pub struct ServerConnection {
     pub uuid: String,
@@ -604,7 +528,7 @@ pub async fn json_registration(
 \end{lstlisting}
 While this code looks complicated (partially due to formatting restrictions), it is actually quite simple. We parse the JSON request into a RegistrationRequest struct. If fails we send an error to the sender. We then forward the request to our "registration\_service\_client", which is a gRPC client registered as a frontend with the server. This is contained in a Mutex, due to the fact that it may be accessed concurrently, so we need to wait for it's lock to be available first. Finally, we check that the response is not an error. If it is not, we turn the response to a string and forward it to the sender, otherwise we forward the error message.
 
-In subsection~\ref{sec:chapdesign:server:protoBufs} it was mentioned that the protobuf compiler needed to implement the interfaces Serialize and Deserialize on the protobuf files in the frontend folder. The reason for this can be seen in the code snippet above. Requests that are in the form of JSON need to be turned into their corresponding Rust structs. This is done using the "serde\_json" library. If the "Serialize" and "Deserialize" traits are not implemented on structs from the protobuf file, then JSON requests will not be parsed. In fact, due to Rust's type system, the program will not even compile.
+In subsection~\ref{sec:chapimpl:server:protoBufs} it was mentioned that the protobuf compiler needed to implement the interfaces Serialize and Deserialize on the protobuf files in the frontend folder. The reason for this can be seen in the code snippet above. Requests that are in the form of JSON need to be turned into their corresponding Rust structs. This is done using the "serde\_json" library. If the "Serialize" and "Deserialize" traits are not implemented on structs from the protobuf file, then JSON requests will not be parsed. In fact, due to Rust's type system, the program will not even compile.
 
 \section{Security} \label{sec:chapimpl:security}
 This section will briefly showcase implementations of the protocols described within subsection~\ref{sec:chapdesign:security}. The code snippet is from the file \textit{\textbf{backend/src/server/certificate\_signing.rs}} 
