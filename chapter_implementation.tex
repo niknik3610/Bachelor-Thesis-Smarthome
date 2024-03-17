@@ -40,6 +40,13 @@ Here we define a service called "RegistrationService", with a function called Re
 message DeviceCapabilityStatus {
     bool available = 1;
     string capability = 2;
+    DeviceCapabilityType type = 3;
+    optional float value = 4;
+}
+
+enum DeviceCapabilityType {
+    BUTTON = 0;
+    SLIDER = 1;
 }
 \end{lstlisting}
 
@@ -158,29 +165,20 @@ message RegistrationRequest {
     repeated iot.types.DeviceCapabilityStatus 
         capabilities = 3;
 }
-
-//from proto/iot/types.proto
-message DeviceCapabilityStatus {
-    bool available = 1;
-    string capability = 2;
-}
 \end{lstlisting}
-This is the same protobuf code detailed in subsection~\ref{sec:chapimpl:server:protoBufs}. The "RegistrationRequest" contains the device's public key and its display name. The public key will be used for encryption and signing, the name is what the device is called on the frontend-interface. The final field is an array of type "DeviceCapabilityStatus", which is a message (struct) with two fields. A capability in this system represents something the device can do. This takes the form of a string. If a capability is available, that means the server relays that capability to any frontend devices connected to the server. If it is not available, the server still keeps that information, but does not relay it to frontends. 
+This is the same protobuf code as in subsection~\ref{sec:chapimpl:server:protoBufs}. The "RegistrationRequest" contains the device's public key and its display name. The public key will be used for encryption and signing, the name is what the device is called on the frontend-interface. The final field is an array of type "DeviceCapabilityStatus". A capability in this system represents something the device can do. This takes the form of a string. If a capability is available, that means the server relays that capability to any frontend devices connected to the server. If it is not available, the server still keeps that information, but does not relay it to frontends. Finally, a capability also has a type, which is how it is represented in the frontend. Currently, it can be shown as a button, or a slider.
 
-A simple example of a capability is one for a lamp. A lamp could have two capabilities, "turn on" and "turn off". If the lamp is off, the capability "turn on" is available to the user. If the user decides to invoke that capability, the lamp will turn on, the "turn on" capability will no longer be available and the "turn off" capability will become available. 
+A simple example of a capability is one for a lamp. A lamp could have two capabilities, "turn on" and "turn off", both being represented as buttons. If the lamp is off, the capability "turn on" is available to the user. If the user decides to invoke that capability, the lamp will turn on, the "turn on" capability will no longer be available and the "turn off" capability will become available. Finally, the lamp could have a capability called brightness, that controls the brightness of the lamp, this could be represented by a slider.
 
 This system has much room for extension, with some glaring features that need to be added being:
 \begin{itemize}
-    \item Optional variables attached, such as a float value. Could be used for turning up a speaker for example.
-\todo{still planning to implement this before deadline, add more stuff here}
     \item Access levels, only an admin can see this capability.
+    \item Additional capability types, such as flip switches, or input fields
 \end{itemize}
 
 The device sends this registration request to the server. With the information from the request, the server can then register the device in a HashMap, which maps the device UUID to the Device struct, following the steps described in figure~\ref{fig:server_registration}. The Device struct is defined in \textit{\textbf{/backend/src/server/device.rs}} as:
 \todo{fix this code snippet}
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
-use crate::types::types::DeviceCapabilityStatus;
-#[derive(Clone)]
 pub struct Device {
     pub name: String,
     pub uuid: Uuid,
@@ -188,9 +186,11 @@ pub struct Device {
     pub active_capabilities: Vec<DeviceCapabilityStatus>,
     pub inactive_capabilities: Vec<DeviceCapabilityStatus>,
     pub device_public_key: rsa::RsaPublicKey,
+    pub device_verification_key: VerifyingKey<Sha256>,
+    pub certificate: String,
 }
 \end{lstlisting}
-The structure of a device is quite self-explanatory, the only thing of note is having the UUID as two fields, one time as the UUID struct and once as a string. This is due to the type conversion being done very often in certain sections of code, it made sense to do this conversion once and reuse it.  
+The structure of a device is quite self-explanatory, the only thing of note is having the UUID as two fields, one time as the UUID struct and once as a string. This is due to the type conversion being done very often in certain sections of code, it made sense to do this conversion once and reuse it. For information about the RSA keys and certificates present in this struct, view the section~\ref{sec:chapimpl:security}. 
 
 \subsection{Device \& Server Communication}
 Device and Server communication happens through polling. Every 0.5 seconds the device sends a request through the "RequestUpdateService" to the server. The service is defined in the \textit{\textbf{/protos/iot/requestUpdateService.proto}} file:
@@ -207,6 +207,13 @@ def poll_for_update(self, request):
     if device == null:
         return PollResponse(
             has_update: PollingOption::DeviceNotFound,
+            updates: [],
+        )
+    
+    signature_valid = verify_signature(device, request)
+    if signature_valid is not True:
+        return PollResponse(
+            has_update: PollingOption::InvalidSignature,
             updates: [],
         )
 
@@ -256,37 +263,23 @@ Another goal of this project was to create a library that can be used by other p
 The main purpose of the library to is to abstract details of how the client \& server connection works away from the programmer. While they can still view the source code due to it being open source, they should not need to know the inner workings of the library to be able to use it. The example below, which can be found within the repository for the example device \textbf{\href{https://github.com/niknik3610/Example-Iot-Device}{here}}, demonstrates usage of the library to create a simple IoT device. The purpose of this device is to toggle an LED, attached to a general purpose input output (GPIO) pin, on and off when the appropriate event is received. This code is made to run on a Raspberry Pi and will therefore not run on non Raspberry Pi Devices. It uses a combination of the NOSHP\_Client library (the library created within this paper) and rrpal, a library commonly used to interact with the Raspberry Pi's GPIO in Rust. View the entire code for this simple IoT device and an in-depth explanation of it below: 
 
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
-use NOSHP_Client::{
-    client::{ClientHandler, Request, State},
-    client_config::{ClientConfig, ParsedConfig},
-};
-use std::error::Error;
-use rppal::gpio::{Gpio, OutputPin};
-
+#[derive(Default)]
 struct ExampleState {
-    led_pin: OutputPin,
+    text: String,
 }
-impl State for ExampleState {}
-impl Default for ExampleState {
-    fn default() -> ExampleState {
-        return ExampleState {
-            led_pin: Gpio::new()
-                .unwrap()
-                .get(GPIO_LED_PIN)
-                .unwrap()
-                .into_output(),
-        };
-    }
-}
+impl UserDefinedState for ExampleState {}
 
-const GPIO_LED_PIN: u8 = 2;
 const CONFIG_PATH: &str = "./example_config.toml";
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let config = 
-        ClientConfig::load_config(CONFIG_PATH).unwrap();
+    let config = ClientConfig::load_config(CONFIG_PATH)
+        .unwrap();
 
-    let client_handler = ClientHandler::new()
+    let client_handler = NoshpClient::new();
+    client_handler
+        .set_state(ExampleState {
+            text: String::from("hello world"),
+        })
         .add_callback("Turn On", Box::new(turn_on_led))
         .add_callback("Turn Off", Box::new(turn_off_led))
         .run(config)
@@ -296,13 +289,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
     return Ok(());
 }
 
-fn turn_on_led(state: &mut ExampleState, req: Request) {
-    state.led_pin.set_high();
-    println!("set pin {} to high", GPIO_LED_PIN);
+fn turn_on_led(
+    _state: &mut ClientState<ExampleState>,
+    _req: Request
+) {
+    println!("Turn On")
 }
-fn turn_off_led(state: &mut ExampleState, req: Request) {
-    state.led_pin.set_low();
-    println!("set pin {} to low", GPIO_LED_PIN);
+
+fn turn_off_led(
+    _state: &mut ClientState<ExampleState>,
+    _req: Request
+) 
+{
+    println!("Turn Off");
 }
 \end{lstlisting}
 
@@ -318,53 +317,43 @@ server_ip = "http://192.168.0.0:2302"
 
 [capability."Turn Off"]
     available = true
+    type = "button"
 
 [capability."Turn On"]
     available = true
+    type = "button"
 \end{lstlisting}
 This configuration is loaded using the "load\_config" method from our library, imported on line 3. 
 \subsubsection{The Client Handler}
-On line 31, we finally construct the client handler, by calling the "new" method on the "ClientHandler" struct, imported from our library on line 2. Calling the new method initializes the variables inside the ClientHandler, including calling the default method on our State. This might be confusing to someone who is new to Rust, as we never informed the ClientHandler of the ExampleState struct. In this case Rust uses type inference, to infer what struct we are trying to use as our client's state. It infers this information from the callback functions we pass to it using the "add\_callback" method, as they define one of their parameters to be "ExampleState". If we were to remove these calls to "add\_callback", Rust would throw an error at compilation, stating that we need to specify the type of State. The definition of "ClientHandler" looks like this (from \textit{\textbf{client\_library/src/client.rs}}):
+On line 31, we finally construct the client handler, by calling the "new" method on the "NoshpClient" struct, imported from the Noshp\_client library. Calling the new method initializes the variables inside the NoshpClient, including calling the default method on our State. This might be confusing to someone who is new to Rust, as we never informed the NoshpClient of the ExampleState struct. In this case Rust uses type inference, to infer what struct we are trying to use as our client's state. It infers this information from the callback functions we pass to it using the "add\_callback" method, as they define one of their parameters to be ExampleState. If we were to remove these calls to add\_callback, Rust would throw an error at compilation, stating that we need to specify the type of State. The definition of the NoshpClient  looks like this (from \textit{\textbf{client\_library/src/client.rs}}):
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
-pub type Callback<S: State> = fn(&mut S, Request);
-pub struct ClientHandler<S: State> {
+pub struct NoshpClient<S: UserDefinedState> {
     callbacks: FxHashMap<String, Box<Callback<S>>>,
-    state: S,
+    client_state: ClientState<S>,
     server_ip: Option<String>,
 }
 \end{lstlisting}
-ClientHandler is a struct that accepts one generic argument, named S. S needs to implement the interface State (which in turn requires an implementation of the interface Default). "ClientHandler" has three fields:
+NoshpClient is a struct that accepts one generic argument, named S. S needs to implement the interface State (which in turn requires an implementation of the interface Default). NoshpClient has three fields:
 \begin{itemize}
     \item Callbacks - A hashmap used to map capabilities (stored as Strings), to user defined callback functions.
-    \item State - Of type S, used to store the state of the program.
-    \item Server\_ip - Of type option, stores either a string representation of the server's IP address and port, or None. It has the option type, due to there being multiple ways of giving the ClientHandler the server's IP address, however the client will not start if server\_ip is None when the "run" method is called.
+    \item Client State - Of type S, used to store the state of the program.
+    \item Server IP - Of type option, stores either a string representation of the server's IP address and port, or None. It has the option type, due to there being multiple ways of giving the ClientHandler the server's IP address, however the client will not start if server\_ip is None when the "run" method is called.
 \end{itemize}
 
-Once the ClientHandler has been constructed, we use the builder pattern mentioned in subsection~\ref{sec:chapimpl:server:startup}, a very common Rust pattern. There are a few methods currently implemented on the ClientHandler, which we can call using this pattern. The most common one is the "add\_callback" function. We use this to give the ClientHandler a pointer (signified by the "Box" struct in Rust) to our function, along with the capability (defined in the config.toml file) it should be called for. If the user does not add a custom callback, the default callback is used instead, which looks like this (snippet from \textit{\textbf{client\_library/src/client.rs}}):
+Once the NoshpClient has been constructed, we use the builder pattern mentioned in subsection~\ref{sec:chapimpl:server:startup}, a very common Rust pattern. There are a few methods currently implemented on the ClientHandler, which we can call using this pattern. The most common one is the "add\_callback" function. We use this to give the ClientHandler a pointer (signified by the "Box" struct in Rust) to our function, along with the capability (defined in the config.toml file) it should be called for. If no callback is added for a capability, a default function is added instead
 
-\begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
-let callback = self.callbacks.get(&update.capability);
-match callback {
-    Some(v) => v(&mut self.state, request),
-    None => println!(
-        "Received signal to {}", update.capability
-    ),
-}
-\end{lstlisting}
-In summary, this snippet gets the callback from the callbacks hashmap defined on the ClientHandler, if the callback is defined by the user we call it, otherwise \textit{"Received signal to Turn On"} (for the capability "Turn On") is printed.
-
-The "Client Handler" has some other useful functions which the user can call. Some examples of these are:
+The NoshpClient struct has some other useful methods which the user can call. Some examples of these are:
 \begin{itemize}
     \item Set\_state - Allows the user to set the state of the program to the non-default implementation. Can be useful if the state is determined programatically. This could allow the machine to change behavior at runtime. An example of this is having different behaviour depending on where the device is located.
     \item Set\_server\_ip - While the IP can simply be set in the config and read at runtime, it can instead of be passed using this function. This allows the user to programmatically determine the IP address, for example using network discovery to discover the IP address of the server, instead of using static IPs like in this example.
 \end{itemize}
 
-These methods can be useful, but are not required for using the library. Once all callbacks have been and other additional user parameters have been added, the run method is called. The run method accepts the configuration (obtained through the load\_config function) for the device as a paramter and returns a future, which must be awaited using the await keyword (view subsection~\ref{sec:chapimpl:server:threads}). This allows the ClientHandler to be used concurrently to any other tasks the client has to perform. \todo{add a smaller blurb about what the ClientHandler does internally}
+These methods can be useful, but are not required for using the library. Once all callbacks have been and other additional user parameters have been added, the run method is called. The run method accepts the configuration (obtained through the load\_config function) for the device as a parameter and returns a future, which must be awaited using the await keyword (view subsection~\ref{sec:chapimpl:server:threads}). This allows the NoshpClient to be used concurrently to any other tasks the client has to perform. 
 
 \subsubsection{Callback Functions}
-Finally, the callback functions, used in the "add\_callback" method on the ClientHandler are defined. The ClientHandler struct accepts callback functions, that accept two parameters and return void (defined as having no return value in rust). The first parameter must be a Struct that implements the interface State, which the "ClientHandler" uses to infer the type of State in the above example. The second parameter must be of type Request. This is a simple struct that is currently not in use, but will be used in the future for the frontend to pass specific parameters to the client. For example, a slider's value on the frontend could be passed within the Request parameter. As mentioned, this is not implemented yet.
+Finally, the callback functions, used in the "add\_callback" method on the NoshpClient are defined. The NoshpClient struct accepts callback functions, that must take two parameters and return void (defined as having no return value in Rust). The first parameter must be a Struct that implements the interface State, which the NoshpClient uses to infer the type of State in the above example. The second parameter must be of type Request. Request is a simple struct with one parameter, an optional float. This is useful if the capability is a slider, as the request parameter will contain the information about what value the slider had when the request was called. This can easily be extended in the future. 
 
-The functions in this case are fairly simple. They use the GPIO pin stored within the ExampleState to turn on and off the LED connected to the GPIO pin, using the methods defined in the rppal library.
+The functions in this case are very simple, they simply print a small statement about what they are intended to do. For example, if the frontend activates the capability "Turn On", then "Turn On" will be printed on the device side.
 
 \subsection{Device Registration} \label{sec:chapimpl:devicelib:registration}
 While device registration is described in detail within subsection~\ref{sec:chapimpl:server:registration}, how the library handles registration on the client side will be briefly touched upon within this section.
@@ -467,6 +456,7 @@ The web frontend was built using a combination of Typescript and VueJS. It mainl
 The web frontend can be run from the \textit{\textbf{vue\_frontend}} directory. Using the node packet manager (NPM), using the command: \verb|npm install|. Once all dependencies have been installed, protobuf files must be compiled. This can be done using the bash script \textit{\textbf{vue\_frontend/build\_proto.sh}}. From there the site can be hosted using: \verb|npm run dev|, and can be accessed at \mbox{localhost:5173}.
 
 \subsubsection{Design}
+\todo{add a showcase of the slider to this screen shot as well}
 The final design of the frontend is fairly close to the original design proposed within figure~\ref{fig:home_screen_mockup}. View figure~\ref{fig:home_screen_final} for the final design (note that for readability reasons it has been zoomed in considerably).
 
 \begin{figure}[h]
