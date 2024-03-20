@@ -5,8 +5,6 @@ This chapter aims to provide a low-level, in-depth explanation of how a variety 
 Due to the server being the largest part of this project, and practically being a requirement for testing the client and frontend functionality, this will be focused on first. This section will describe defining and compiling protobuf files for API endpoints, server startup, how IOT devices are registered, security mechanisms and how concurrency was handled within the server. 
 
 \subsection{Protocol Buffers} \label{sec:chapimpl:server:protoBufs}
-\todo{I think this section should be shortened}
-
 Remote functions accessible through gRPC are defined in ".proto" files. They use a fairly basic syntax, where the user can define a service using the "service" keyword. A service can contain many functions which a client can call, these are defined using the "rpc" keyword. Structs are defined using the "message" keyword, where each field is separated by a semicolon. These structs will then be compiled to their corresponding datatype in whatever language you are using. For example, they are compiled to classes in Typescript or structs in Rust. This makes them useful if a datatype is shared between languages,  they can be defined in one protbuf file and used across languages. Protobuf structs contain fields, which can have multiple modifiers, including optional and repeated. Repeated marks a field as possibly being a list, or array structure, optional marks a field as optional (represented differently between languages). Finally, messages from other files can be imported. Below is the service definition for the RegistrationService, found in \textbf{\textit{protos/iot/registrationService.proto}}:
 
 \begin{lstlisting}[language=protobuf3, style=boxed]{iot/registrationService.proto}
@@ -177,7 +175,6 @@ This system has much room for extension, with some glaring features that need to
 \end{itemize}
 
 The device sends this registration request to the server. With the information from the request, the server can then register the device in a HashMap, which maps the device UUID to the Device struct, following the steps described in figure~\ref{fig:server_registration}. The Device struct is defined in \textit{\textbf{/backend/src/server/device.rs}} as:
-\todo{fix this code snippet}
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
 pub struct Device {
     pub name: String,
@@ -199,7 +196,7 @@ service RequestUpdateService {
     rpc PollForUpdate(PollRequest) returns (PollResponse);
 };
 \end{lstlisting}
-The "RequestUpdateService" has one function, named "PollForUpdate". It accepts a "PollRequest" as a parameter and returns a "PollResponse". When a device requests an update from the server, it must provide its UUID, certificate, a timestamp of when it was sent and the signature of the message, so the server knows what device is requesting and so the server can ensure that the device is who it says it is. Additionally, it provides it's updated list of capabilities. Below is some pseudocode to show how the server creates a response (you can view the real function in file \textit{\textbf{backend/src/server/polling.rs}}): \todo{add signature to this}
+The "RequestUpdateService" has one function, named "PollForUpdate". It accepts a "PollRequest" as a parameter and returns a "PollResponse". When a device requests an update from the server, it must provide its UUID, certificate, a timestamp of when it was sent and the signature of the message, so the server knows what device is requesting and so the server can ensure that the device is who it says it is. Additionally, it provides it's updated list of capabilities. Below is some pseudocode to show how the server creates a response (you can view the real function in file \textit{\textbf{backend/src/server/polling.rs}}): 
 
 \begin{lstlisting}[language=Python, style=boxed, showstringspaces=false]{}
 def poll_for_update(self, request):
@@ -259,7 +256,6 @@ When the client receives the response to their poll, they can then decide what t
 Another goal of this project was to create a library that can be used by other programmers, to easily create an IoT device that can connect to this system. This library was written for use with Rust. It is published within the Rust library ecosystem website, found at \textit{crates.io}. The library entry on \textit{crates.io} can be found be \textbf{\href{https://crates.io/crates/NOSHP-Client}{here}}. 
 
 \subsection{Using the Library}
-\todo{some of this code has outdated code fix that}
 The main purpose of the library to is to abstract details of how the client \& server connection works away from the programmer. While they can still view the source code due to it being open source, they should not need to know the inner workings of the library to be able to use it. The example below, which can be found within the repository for the example device \textbf{\href{https://github.com/niknik3610/Example-Iot-Device}{here}}, demonstrates usage of the library to create a simple IoT device. The purpose of this device is to toggle an LED, attached to a general purpose input output (GPIO) pin, on and off when the appropriate event is received. This code is made to run on a Raspberry Pi and will therefore not run on non Raspberry Pi Devices. It uses a combination of the NOSHP\_Client library (the library created within this paper) and rrpal, a library commonly used to interact with the Raspberry Pi's GPIO in Rust. View the entire code for this simple IoT device and an in-depth explanation of it below: 
 
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}

@@ -25,10 +25,10 @@ Sethi and Sarangi \cite{IoTArchitectures} define six components that need to be 
 \end{enumerate}
 
 There are some specific constraints specific to Smart Homes. Reliability is a key concern, due to the lack of a trained professional being available to fix any issues that arise. This is contrast to more industrial IoT settings, where there might be someone to fix any issues that arise. Another concern is the security and privacy of the system. Due to smart homes inherently having access to sensitive data (due to their position in someone's home), one must ensure that the system is both ethically sound and secure. The issue of security is further discussed in Subsection~\ref{sec:chap2:security}.
-\todo{further add to this section, just not sure what yet}
+
 
 \section{APIs and Web Interfaces} \label{sec:chap2:API}
-The book "Designing Web APIs" makes an important distinction about APIs that can often be forgotten by developers. "Although APIs are designed to work with other programs, they’re mostly intended to be understood and used by humans writing those other programs" \cite{DesigningWebApis} (Chapter 1). Due to this reality, one must remember to design APIs appropriately. To help the API designer in doing that, there are multiple pre-defined architectural standards that they can use. 
+The book "Designing Web APIs" makes an important distinction about APIs that can often be forgotten by developers. "Although APIs are designed to work with other programs, they’re mostly intended to be understood and used by humans writing those other programs" \cite{DesigningWebApis}. Due to this reality, one must remember to design APIs appropriately. To help the API designer in doing that, there are multiple pre-defined architectural standards that they can use. 
 
 \subsection{Request Response}
 "Request Response" APIs (RRA) expose their interface through a web server, to which clients can make requests. A client will request data and will receive a response from the server. Common formats for requests and responses include JavaScript Object Notation (JSON) and Extensible Markup Language (XML). \cite{DesigningWebApis}. 
@@ -44,7 +44,4 @@ Web sockets are a type of Event Driven API that utilize a bidirectional TPC conn
 
 The final type of API that deserves a short mention is the Web Hook. Web hooks work in an unconventional manner, where the initiator of an exchange gives a URL to their own API endpoint. This URL is then used by the receiver. Whenever a new event for the initiator occurs, the receiver will send information about the event to the URL \cite{DesigningWebApis}. While at face value this may seem like an obvious solution in an IOT based environment, where devices are often waiting for an event from the central server, it makes less sense when one realizes that every device connected to this webhook will need to host some sort of HTTP server, to receive the API requests. This makes it unsuitable, especially in environments where IOT devices are low powered, embedded systems devices. Web hooks are often used in server to server communication, as in such a scenario they are trivial to set up (as servers will most likely already be setup to receive API requests) \cite{DesigningWebApis}.
 \todo{Add section about which one I chose: RPC, specifically gRPC}
-
-\section{Security} \label{sec:chap2:security}
-I need to see with the word count if I can write this section \todo{view note}
 
