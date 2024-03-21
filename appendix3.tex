@@ -1,8 +1,28 @@
-\chapter{Terminology}
+\chapter{Programming Topics}
 
 \section{Rust Terminology Explained} \label{cha3:rustterms}
 This section contains a simple list of Rust terms and their meaning in relation to traditional programming terms.
 \begin{itemize}
     \item Crate: Rust's version of a library. Due to the way generics are handled at compile-time in Rust, Rust libraries are usually shipped as their source code, therefore they are not technically libraries in the traditional sense of the word. This also means that most Rust crates are open-source and need to be compiled at least once. This is part of the reason that Rust projects, especially ones with a lot of crates, take a long time to compile.
     \item Trait: The equivalent of an interface in Rust. If a struct wants to implement a certain trait, they will need to implement all functions defined in that trait. This allows for powerful behavior with generics.
+\end{itemize}
+
+\section{Libraries used for this project}
+Below is a list of major libraries used during the creation of this project:
+\center \textbf{Rust}
+\begin{itemize}
+    \item Tokio: An asynchronous runtime commonly used in Rust projects, required for some dependencies (such as the gRPC and HTTP servers) to function. Enables use of Async/Await syntax.
+    \item Tonic: gRPC and Protobuffer support in Rust, including transpiling protobuffers to Rust code and running a gRPC server.
+    \item RSA: An RSA library for Rust, used to generate private/public key pairs, sign messages and encrypt/decrypt messages
+    \item Serde: Serialization and deserialization of datastructures in Rust. In combination with serde-json allows easy serialization and deserialization of JSON data.
+    \item RPPal: Easily interface with Raspberry Pi GPIO pins.
+    \item Actix-web: HTTP web server implementation in Rust.
+    \item Clap: Command line argument parser for Rust
+\end{itemize}
+
+\center \textbf{Javascript}
+\begin{itemize}
+    \item VueJS: A web development framework that allows for easy frontend development
+    \item Typescript: Types in Javascript, all typescript code is transpiled to native Javascript
+    \item ProtobufJs: A protobuf implementation that allows transpilation of protobuffers to Typescript
 \end{itemize}
