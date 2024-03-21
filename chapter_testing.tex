@@ -141,7 +141,7 @@ Five amount of clients were tested: 1, 10, 100, 500 and 700 clients connected to
 
 To simulate a high server load, the program simulating a DDOS attack (described above) was used. This program ran with 100 iterations for every number of clients, triggering each of their two capability. Each client would therefore have 200 requests, as fast as the server could receive them. Keeping the iterations the same for every run gave an advantage to the smaller number of clients, as not only did the server have to deal with fewer clients, but also less total requests. That being said it is a worthwhile trade-off, as this is mainly a test of how many requests the server can handle, before slowing down. The number of clients mainly has an impact on memory usage, not on performance. In this case that main way of scaling requests was simply to increase clients. Additionally, it also gives the server an advantage, due to the way the server code is written. Each client can be accessed independently, at the same time (by multiple cores or threads). However, due to the use of mutual exclusion, each client could only be accessed from one thread at a time. So having more requests, with less clients, would actually have a larger impact on server performance than the other way around.
 
-\subsubsection{Results}
+\subsubsection{Results} \label{chap:testing:results}
 \begin{center}
     \textbf{Table of Test Results:} 
 \begin{tabular}{ |c|c|c| } 
