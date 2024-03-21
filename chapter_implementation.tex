@@ -125,7 +125,7 @@ The "server\_with\_shutdown" method consumes the Server struct and runs the serv
 Once we have added all services to the Server struct, it must be awaited using the "await" keyword. For more information on how this works view subsection~\ref{sec:chapimpl:server:threads}.  
 
 \subsubsection{Starting the HTTP Server}
-Starting the HTTP server works almost the same as the gRPC server, using the same builder pattern. However, this time instead of using the Tonic crate, we are using a crate named "Actix", a self-described "powerful, pragmatic, and extremely fast web framework for Rust" \cite{actixWebsite}. View part of the "run\_json\_frontend" function, found in the file \textbf{\textit{backend/src/server/server.rs}} below:
+Starting the HTTP server works almost the same as the gRPC server, using the same builder pattern. However, this time instead of using the Tonic crate, we are using a crate named "Actix", a self-described "powerful, pragmatic, and extremely fast web framework for Rust". View part of the "run\_json\_frontend" function, found in the file \textbf{\textit{backend/src/server/server.rs}} below:
 \begin{lstlisting}[language=Rust, style=boxed, showstringspaces=false]{}
 const JSON_ADDRESS: &str = "localhost:50052";
 
